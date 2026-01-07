@@ -154,6 +154,7 @@ function renderPosts() {
 
     elements.postList.innerHTML = currentPosts.map((post, index) => {
         const countryTag = post.country ? `[${post.country}]` : '';
+        const authorDisplay = state.isAdmin ? (post.data?.name || '익명') : '익명';
         return `
             <tr data-id="${post.id}">
                 <td class="col-no" style="text-align: center;">${state.posts.length - start - index}</td>
@@ -166,7 +167,7 @@ function renderPosts() {
                         <span>${countryTag} 구조요청</span>
                     </div>
                 </td>
-                <td class="col-author">익명</td>
+                <td class="col-author">${escapeHtml(authorDisplay)}</td>
                 <td class="col-date">${post.date}</td>
             </tr>
         `;
@@ -314,6 +315,7 @@ function showAdminModal() {
         state.isAdmin = false;
         elements.adminBtn.textContent = '관리자 로그인';
         elements.adminBtn.classList.remove('logged-in');
+        renderPosts(); // 목록 새로고침해서 익명으로 표시
         alert('관리자 로그아웃 되었습니다.');
         return;
     }
@@ -335,6 +337,7 @@ function handleAdminLogin() {
         elements.adminBtn.textContent = '관리자 로그아웃';
         elements.adminBtn.classList.add('logged-in');
         hideAdminModal();
+        renderPosts(); // 목록 새로고침해서 이름 표시
         alert('관리자로 로그인되었습니다. 모든 게시글을 볼 수 있습니다.');
     } else {
         alert('관리자 비밀번호가 일치하지 않습니다.');
@@ -424,12 +427,6 @@ function showEditForm(post) {
     // 문서번호와 날짜 설정
     elements.docNumber.value = post.docNumber || '';
     elements.writeDate.textContent = post.date;
-    
-    // 나라 입력
-    const countryInput = document.getElementById('country-input');
-    if (countryInput && post.country) {
-        countryInput.value = post.country;
-    }
     
     // 비밀번호
     document.getElementById('password').value = post.password;
@@ -570,11 +567,11 @@ async function handleSubmit(e) {
     e.preventDefault();
 
     const formData = new FormData(e.target);
-    const countryInput = formData.get('country_input');
+    const countryCity = formData.get('country_city');
     const password = formData.get('password');
 
-    if (!countryInput || !password) {
-        alert('국가와 비밀번호는 필수입니다.');
+    if (!countryCity || !password) {
+        alert('국가/도시와 비밀번호는 필수입니다.');
         return;
     }
 
@@ -628,7 +625,7 @@ async function handleSubmit(e) {
             state.posts[postIndex] = {
                 ...state.posts[postIndex],
                 author: '익명',
-                country: countryInput,
+                country: countryCity,
                 password: password,
                 docNumber: elements.docNumber.value || '',
                 data: postData,
@@ -645,7 +642,7 @@ async function handleSubmit(e) {
         const post = {
             id: generateId(),
             author: '익명',
-            country: countryInput,
+            country: countryCity,
             password: password,
             date: new Date().toISOString().split('T')[0],
             docNumber: elements.docNumber.value || '',
