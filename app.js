@@ -152,22 +152,25 @@ function renderPosts() {
     const end = start + state.postsPerPage;
     const currentPosts = state.posts.slice(start, end);
 
-    elements.postList.innerHTML = currentPosts.map((post, index) => `
-        <tr data-id="${post.id}">
-            <td class="col-no" style="text-align: center;">${state.posts.length - start - index}</td>
-            <td class="col-title">
-                <div class="post-title">
-                    <svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                    </svg>
-                    <span>구조요청</span>
-                </div>
-            </td>
-            <td class="col-author">${escapeHtml(post.author)}</td>
-            <td class="col-date">${post.date}</td>
-        </tr>
-    `).join('');
+    elements.postList.innerHTML = currentPosts.map((post, index) => {
+        const countryTag = post.country ? `[${post.country}]` : '';
+        return `
+            <tr data-id="${post.id}">
+                <td class="col-no" style="text-align: center;">${state.posts.length - start - index}</td>
+                <td class="col-title">
+                    <div class="post-title">
+                        <svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <span>${countryTag} 구조요청</span>
+                    </div>
+                </td>
+                <td class="col-author">익명</td>
+                <td class="col-date">${post.date}</td>
+            </tr>
+        `;
+    }).join('');
 
     // 게시글 클릭 이벤트
     elements.postList.querySelectorAll('tr').forEach(row => {
@@ -422,8 +425,13 @@ function showEditForm(post) {
     elements.docNumber.value = post.docNumber || '';
     elements.writeDate.textContent = post.date;
     
-    // 기본 정보
-    document.getElementById('author').value = post.author;
+    // 나라 입력
+    const countryInput = document.getElementById('country-input');
+    if (countryInput && post.country) {
+        countryInput.value = post.country;
+    }
+    
+    // 비밀번호
     document.getElementById('password').value = post.password;
     
     // 폼 데이터 채우기
@@ -562,11 +570,11 @@ async function handleSubmit(e) {
     e.preventDefault();
 
     const formData = new FormData(e.target);
-    const author = formData.get('author');
+    const countryInput = formData.get('country_input');
     const password = formData.get('password');
 
-    if (!author || !password) {
-        alert('글쓴이와 비밀번호는 필수입니다.');
+    if (!countryInput || !password) {
+        alert('국가와 비밀번호는 필수입니다.');
         return;
     }
 
@@ -619,7 +627,8 @@ async function handleSubmit(e) {
         if (postIndex !== -1) {
             state.posts[postIndex] = {
                 ...state.posts[postIndex],
-                author: author,
+                author: '익명',
+                country: countryInput,
                 password: password,
                 docNumber: elements.docNumber.value || '',
                 data: postData,
@@ -635,7 +644,8 @@ async function handleSubmit(e) {
         // 새 글 작성
         const post = {
             id: generateId(),
-            author: author,
+            author: '익명',
+            country: countryInput,
             password: password,
             date: new Date().toISOString().split('T')[0],
             docNumber: elements.docNumber.value || '',
