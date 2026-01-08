@@ -201,7 +201,7 @@ function resetForm() {
     elements.filePreview.innerHTML = '';
     elements.uploadProgress.classList.add('hidden');
     elements.docNumber.value = '';
-    elements.familyRows.innerHTML = '<tr><td data-label="성명"><input type="text" name="family_name[]" class="form-input"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input"></td><td data-label="상세내용"><input type="text" name="family_detail[]" class="form-input"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input"></td></tr>';
+    elements.familyRows.innerHTML = '<tr><td data-label="성명"><input type="text" name="family_name[]" class="form-input"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input"></td></tr>';
     elements.budgetRows.innerHTML = '<tr><td data-label="세부항목"><input type="text" name="budget_item[]" class="form-input"></td><td data-label="산출근거"><input type="text" name="budget_basis[]" class="form-input"></td><td data-label="금액"><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td></tr>';
     elements.budgetTotal.value = '';
     elements.submitBtn.disabled = false;
@@ -298,9 +298,14 @@ function showEditForm(post) {
     elements.familyRows.innerHTML = '';
     (families.length ? families : [{}]).forEach(fam => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td data-label="성명"><input type="text" name="family_name[]" class="form-input" value="${escapeHtml(fam.name||'')}"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input" value="${escapeHtml(fam.relation||'')}"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input" value="${escapeHtml(fam.age||'')}"></td><td data-label="상세내용"><input type="text" name="family_detail[]" class="form-input" value="${escapeHtml(fam.detail||'')}"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input" value="${escapeHtml(fam.contact||'')}"></td>`;
+        tr.innerHTML = `<td data-label="성명"><input type="text" name="family_name[]" class="form-input" value="${escapeHtml(fam.name||'')}"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input" value="${escapeHtml(fam.relation||'')}"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input" value="${escapeHtml(fam.age||'')}"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input" value="${escapeHtml(fam.contact||'')}"></td>`;
         elements.familyRows.appendChild(tr);
     });
+    // 상세내용 복원
+    const detailTextarea = document.querySelector('.family-detail');
+    if (detailTextarea && families.length > 0) {
+        detailTextarea.value = families[0].detail || '';
+    }
     // 예산 행 복원
     const budgets = d.budgets || [];
     elements.budgetRows.innerHTML = '';
@@ -318,7 +323,7 @@ function showEditForm(post) {
 // 동적 행 추가/삭제
 function addFamilyRow() {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td data-label="성명"><input type="text" name="family_name[]" class="form-input"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input"></td><td data-label="상세내용"><input type="text" name="family_detail[]" class="form-input"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input"></td>';
+    tr.innerHTML = '<td data-label="성명"><input type="text" name="family_name[]" class="form-input"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input"></td>';
     elements.familyRows.appendChild(tr);
 }
 function removeLastFamilyRow() {
@@ -464,11 +469,194 @@ async function handleSubmit(e) {
 
 function renderPostContent(post) {
     const d = post.data;
-    const famHtml = (d.families || []).map(f => `<tr><td>${escapeHtml(f.name||'')}</td><td>${escapeHtml(f.relation||'')}</td><td>${escapeHtml(f.age||'')}</td><td>${escapeHtml(f.detail||'')}</td><td>${escapeHtml(f.contact||'')}</td></tr>`).join('') || '<tr><td colspan="5">-</td></tr>';
-    const budHtml = (d.budgets || []).map(b => `<tr><td>${escapeHtml(b.item||'')}</td><td>${escapeHtml(b.basis||'')}</td><td>${escapeHtml(b.amount||'')}</td></tr>`).join('') || '<tr><td colspan="3">-</td></tr>';
-    const attHtml = post.attachments?.length ? `<div class="attachments-section"><h3>첨부파일</h3><div class="attachments-grid">${post.attachments.map((f,i) => `<div class="attachment-item">${f.type?.startsWith('image/') ? `<img src="${f.url}" alt="">` : `<div class="file-icon" style="height:140px;display:flex;align-items:center;justify-content:center;background:#f2f2f2"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>`}<div class="attachment-info"><span class="attachment-name">${escapeHtml(f.name)}</span><a href="${f.url}" target="_blank" class="download-btn">다운로드</a></div></div>`).join('')}</div></div>` : '';
     const dateStr = post.created_at ? new Date(post.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '';
-    elements.postContent.innerHTML = `<div class="form-document" id="print-area"><div class="doc-header"><table class="info-table"><tr><td class="label-cell">문서번호</td><td class="value-cell">${escapeHtml(post.doc_number||'')}</td></tr></table><h1 class="doc-title">Intake Report (구조 요청 신청서)</h1><table class="info-table"><tr><td class="label-cell">담당/직책</td><td class="value-cell">${escapeHtml(d.position||'')}</td><td class="label-cell">작성일</td><td class="value-cell">${dateStr}</td></tr></table></div><h2 class="section-title">1. 구조 대상자 개요</h2><table class="data-table"><tr><td rowspan="5" class="section-label"><span class="required">* 인적사항</span></td><td class="label-cell">국가/도시</td><td colspan="3">${escapeHtml(d.country_city||'')}</td></tr><tr><td class="label-cell">이름</td><td>${escapeHtml(d.name||'')}</td><td class="label-cell">불법체류사유</td><td>${escapeHtml(d.illegal_reason||'')}</td></tr><tr><td class="label-cell">연락처</td><td>${escapeHtml(d.contact||'')}</td><td class="label-cell">불법체류기간</td><td>${escapeHtml(d.illegal_period||'')}</td></tr><tr><td class="label-cell">현재주소</td><td colspan="3">${escapeHtml(d.current_address||'')}</td></tr><tr><td class="label-cell">한국주소</td><td colspan="3">${escapeHtml(d.korea_address||'')}</td></tr></table><table class="data-table"><tr><td rowspan="3" class="section-label"><span class="required">* 추천인</span></td><td class="label-cell">성명</td><td>${escapeHtml(d.recommender_name||'')}</td><td class="label-cell">연락처</td><td>${escapeHtml(d.recommender_contact||'')}</td></tr><tr><td class="label-cell">소속기관</td><td>${escapeHtml(d.recommender_org||'')}</td><td class="label-cell">이메일</td><td>${escapeHtml(d.recommender_email||'')}</td></tr><tr><td class="label-cell">기관주소</td><td colspan="3">${escapeHtml(d.recommender_address||'')}</td></tr></table><table class="data-table"><tr><td class="section-label"><span class="required">* 가족사항</span></td><td class="label-cell">성명</td><td class="label-cell">관계</td><td class="label-cell">나이</td><td class="label-cell">상세내용</td><td class="label-cell">연락처</td></tr>${famHtml}</table><h2 class="section-title">구조 예산안</h2><table class="data-table budget-table"><thead><tr><td class="label-cell">세부항목</td><td class="label-cell">산출근거</td><td class="label-cell">금액</td></tr></thead><tbody>${budHtml}</tbody><tfoot><tr><td colspan="2" class="label-cell">합계</td><td>${escapeHtml(d.budget_total||'')}</td></tr></tfoot></table><h2 class="section-title section-divider">2. 세부사항</h2><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 현지 생활 현황</span></span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.local_life||'')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 건강상태</span></span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.health_status||'')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 귀국 후 계획</span></span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.return_plan||'')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 사례 접수 경위</span></span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.case_history||'')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title">전문가 의견</span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.expert_opinion||'')}</div></div></div>${attHtml}`;
+    
+    // 가족사항 행
+    const famRows = (d.families || []).map(f => `
+        <tr>
+            <td data-label="성명"><span class="view-text">${escapeHtml(f.name||'')}</span></td>
+            <td data-label="관계"><span class="view-text">${escapeHtml(f.relation||'')}</span></td>
+            <td data-label="나이"><span class="view-text">${escapeHtml(f.age||'')}</span></td>
+            <td data-label="연락처"><span class="view-text">${escapeHtml(f.contact||'')}</span></td>
+        </tr>
+    `).join('') || '<tr><td colspan="4">-</td></tr>';
+    
+    const famDetail = (d.families && d.families[0]) ? d.families[0].detail || '' : '';
+    
+    // 예산 행
+    const budRows = (d.budgets || []).map(b => `
+        <tr>
+            <td data-label="세부항목"><span class="view-text">${escapeHtml(b.item||'')}</span></td>
+            <td data-label="산출근거"><span class="view-text">${escapeHtml(b.basis||'')}</span></td>
+            <td data-label="금액"><span class="view-text">${escapeHtml(b.amount||'')}</span></td>
+        </tr>
+    `).join('') || '<tr><td colspan="3">-</td></tr>';
+    
+    // 첨부파일
+    const attHtml = post.attachments?.length ? `
+        <h2 class="section-title">첨부파일</h2>
+        <div class="attachments-grid">
+            ${post.attachments.map(f => `
+                <div class="attachment-item">
+                    ${f.type?.startsWith('image/') ? `<img src="${f.url}" alt="">` : `<div class="file-icon" style="height:140px;display:flex;align-items:center;justify-content:center;background:#f2f2f2"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>`}
+                    <div class="attachment-info">
+                        <span class="attachment-name">${escapeHtml(f.name)}</span>
+                        <a href="${f.url}" target="_blank" class="download-btn">다운로드</a>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    ` : '';
+    
+    elements.postContent.innerHTML = `
+        <div class="form-document" id="print-area">
+            <div class="doc-header">
+                <table class="info-table">
+                    <tr>
+                        <td class="label-cell">문서번호</td>
+                        <td class="value-cell"><span class="view-text">${escapeHtml(post.doc_number||'')}</span></td>
+                    </tr>
+                </table>
+                <h1 class="doc-title">Intake Report (구조 요청 신청서)</h1>
+                <table class="info-table">
+                    <tr>
+                        <td class="label-cell">담당/직책</td>
+                        <td class="value-cell"><span class="view-text">${escapeHtml(d.position||'')}</span></td>
+                        <td class="label-cell">작성일</td>
+                        <td class="value-cell"><span class="view-text">${dateStr}</span></td>
+                    </tr>
+                </table>
+            </div>
+
+            <h2 class="section-title">1. 구조 대상자 개요</h2>
+
+            <!-- 인적사항 -->
+            <div class="table-section">
+                <div class="section-label-header"><span class="required">* 인적사항</span></div>
+                <table class="data-table no-header">
+                    <tr>
+                        <td class="label-cell">국가/도시</td>
+                        <td colspan="3"><span class="view-text">${escapeHtml(d.country_city||'')}</span></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">이름</td>
+                        <td><span class="view-text">${escapeHtml(d.name||'')}</span></td>
+                        <td class="label-cell">불법체류사유</td>
+                        <td><span class="view-text">${escapeHtml(d.illegal_reason||'')}</span></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">연락처</td>
+                        <td><span class="view-text">${escapeHtml(d.contact||'')}</span></td>
+                        <td class="label-cell">불법체류기간</td>
+                        <td><span class="view-text">${escapeHtml(d.illegal_period||'')}</span></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">현재주소</td>
+                        <td colspan="3"><span class="view-text">${escapeHtml(d.current_address||'')}</span></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">한국 주소</td>
+                        <td colspan="3"><span class="view-text">${escapeHtml(d.korea_address||'')}</span></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- 추천인 -->
+            <div class="table-section">
+                <div class="section-label-header"><span class="required">* 추천인</span></div>
+                <table class="data-table no-header">
+                    <tr>
+                        <td class="label-cell">성명</td>
+                        <td><span class="view-text">${escapeHtml(d.recommender_name||'')}</span></td>
+                        <td class="label-cell">연락처</td>
+                        <td><span class="view-text">${escapeHtml(d.recommender_contact||'')}</span></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">소속 기관</td>
+                        <td><span class="view-text">${escapeHtml(d.recommender_org||'')}</span></td>
+                        <td class="label-cell">이메일</td>
+                        <td><span class="view-text">${escapeHtml(d.recommender_email||'')}</span></td>
+                    </tr>
+                    <tr>
+                        <td class="label-cell">기관 주소</td>
+                        <td colspan="3"><span class="view-text">${escapeHtml(d.recommender_address||'')}</span></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- 가족사항 -->
+            <h2 class="section-title">가족사항</h2>
+            <div class="dynamic-section">
+                <div class="section-label-header mobile-only"><span class="required">* 가족사항</span></div>
+                <table class="data-table family-table" id="family-table-view">
+                    <thead>
+                        <tr>
+                            <th class="label-cell">성명</th>
+                            <th class="label-cell">관계</th>
+                            <th class="label-cell">나이</th>
+                            <th class="label-cell">연락처</th>
+                        </tr>
+                    </thead>
+                    <tbody>${famRows}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="detail-row">
+                                <div class="detail-label">상세내용</div>
+                                <div class="view-textarea">${escapeHtml(famDetail)}</div>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- 구조 예산안 -->
+            <h2 class="section-title">구조 예산안</h2>
+            <div class="dynamic-section">
+                <div class="budget-table-header mobile-only">구조 예산안</div>
+                <table class="data-table budget-table">
+                    <thead>
+                        <tr>
+                            <th class="label-cell">세부항목</th>
+                            <th class="label-cell">산출근거</th>
+                            <th class="label-cell">금액</th>
+                        </tr>
+                    </thead>
+                    <tbody>${budRows}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2" class="label-cell">합계</td>
+                            <td><span class="view-text">${escapeHtml(d.budget_total||'')}</span></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <h2 class="section-title section-divider">2. 세부사항</h2>
+
+            <div class="detail-section">
+                <div class="detail-header"><span class="detail-title"><span class="required">* 현지 생활 현황</span></span></div>
+                <div class="view-textarea">${escapeHtml(d.local_life||'')}</div>
+            </div>
+            <div class="detail-section">
+                <div class="detail-header"><span class="detail-title"><span class="required">* 건강상태</span></span></div>
+                <div class="view-textarea">${escapeHtml(d.health_status||'')}</div>
+            </div>
+            <div class="detail-section">
+                <div class="detail-header"><span class="detail-title"><span class="required">* 귀국 후 계획</span></span></div>
+                <div class="view-textarea">${escapeHtml(d.return_plan||'')}</div>
+            </div>
+            <div class="detail-section">
+                <div class="detail-header"><span class="detail-title"><span class="required">* 사례 접수 경위</span></span></div>
+                <div class="view-textarea">${escapeHtml(d.case_history||'')}</div>
+            </div>
+            <div class="detail-section">
+                <div class="detail-header"><span class="detail-title">전문가 의견</span></div>
+                <div class="view-textarea">${escapeHtml(d.expert_opinion||'')}</div>
+            </div>
+
+            ${attHtml}
+        </div>
+    `;
 }
 
 function generatePDF() {

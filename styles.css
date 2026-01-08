@@ -136,6 +136,14 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
 .budget-table-header { display: none; }
 .section-label-header { display: none; }
 .table-section { margin-bottom: 12px; }
+.section-label-inline { display: none; }
+
+.family-table .detail-row { background: #f9f9f9; padding: 10px; }
+.family-table .detail-label { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+.family-table .family-detail { min-height: 60px; }
+
+.view-text { display: inline-block; padding: 6px 8px; min-height: 20px; }
+.view-textarea { min-height: 60px; white-space: pre-wrap; border: 1px solid #ddd; padding: 10px; background: #fff; border-radius: 4px; }
 
 /* 반응형 */
 @media (max-width: 768px) {
@@ -174,13 +182,22 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
     .section-label-inline { display: block; width: 100%; background: var(--primary-color); color: #fff !important; padding: 12px 15px; border-radius: 8px 8px 0 0; font-weight: 700; box-sizing: border-box; }
     .section-label-inline .required { color: #fff !important; }
     .dynamic-section { margin-bottom: 15px; }
-    #family-table { border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; margin-top: 0; }
-    #family-table tbody { padding: 15px; }
-    #family-table tr { border: none; margin: 0; padding: 0; }
-    #family-table tr + tr { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
-    #family-table td { margin-bottom: 12px; }
-    #family-table td:last-child { margin-bottom: 0; }
-    #family-table td:before { content: attr(data-label); font-weight: 600; display: block; margin-bottom: 4px; color: #333; font-size: 12px; }
+    #family-table, #family-table-view { border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; margin-top: 0; }
+    #family-table tbody, #family-table-view tbody { padding: 15px; }
+    #family-table tr, #family-table-view tr { border: none; margin: 0; padding: 0; }
+    #family-table tr + tr, #family-table-view tr + tr { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
+    #family-table td, #family-table-view td { margin-bottom: 12px; }
+    #family-table td:last-child, #family-table-view td:last-child { margin-bottom: 0; }
+    #family-table td:before, #family-table-view td:before { content: attr(data-label); font-weight: 600; display: block; margin-bottom: 4px; color: #333; font-size: 12px; }
+    
+    /* 가족사항 상세내용 */
+    #family-table tfoot, #family-table-view tfoot { display: block; border-top: 1px solid #ddd; }
+    #family-table tfoot tr, #family-table-view tfoot tr { display: block; padding: 15px; margin: 0; border: none; }
+    #family-table tfoot td, #family-table-view tfoot td { display: block; width: 100% !important; margin: 0; }
+    #family-table tfoot td:before, #family-table-view tfoot td:before { display: none; }
+    .detail-row { background: #f9f9f9; }
+    .detail-label { font-weight: 600; margin-bottom: 8px; font-size: 13px; }
+    .family-detail, .view-textarea { width: 100% !important; min-height: 60px; box-sizing: border-box; }
     
     /* 예산안 - 회색 */
     .budget-table-header { display: block; background: #666; color: #fff; padding: 12px 15px; border-radius: 8px 8px 0 0; font-weight: 700; }
