@@ -3,17 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>구조 요청 게시판</title>
+    <title>한인구조단 구조 요청</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>구조 요청 게시판</h1>
-            <p class="subtitle">Rescue Request Board</p>
+            <h1>한인구조단 구조 요청</h1>
+            <div id="kst-clock" class="kst-clock hidden"></div>
         </header>
 
         <!-- 게시판 목록 -->
@@ -21,6 +22,7 @@
             <div class="board-header">
                 <div class="admin-login">
                     <button id="admin-btn" class="btn btn-admin">관리자 로그인</button>
+                    <button id="csv-download-btn" class="btn btn-csv hidden">CSV 다운로드</button>
                 </div>
             </div>
             <div class="board-table-wrapper">
@@ -33,15 +35,11 @@
                             <th class="col-date">작성시간</th>
                         </tr>
                     </thead>
-                    <tbody id="post-list">
-                        <!-- 게시글 목록이 여기에 동적으로 추가됩니다 -->
-                    </tbody>
+                    <tbody id="post-list"></tbody>
                 </table>
             </div>
             <div class="board-footer">
-                <div class="pagination" id="pagination">
-                    <!-- 페이지네이션 -->
-                </div>
+                <div class="pagination" id="pagination"></div>
                 <button id="write-btn" class="btn btn-write">글쓰기</button>
             </div>
         </main>
@@ -55,17 +53,16 @@
             <form id="rescue-form" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="password">비밀번호 <span class="required">*</span></label>
-                    <input type="password" id="password" name="password" required placeholder="게시글 비밀번호">
+                    <input type="password" id="password" name="password" required>
                     <small>다른 사람이 글을 볼 수 없도록 비밀번호를 설정하세요</small>
                 </div>
 
-                <!-- 구조 요청 양식 시작 -->
                 <div class="form-document">
                     <div class="doc-header">
                         <table class="info-table">
                             <tr>
                                 <td class="label-cell">문서번호</td>
-                                <td class="value-cell"><input type="text" id="doc-number" name="doc_number" class="form-input" placeholder="문서번호 입력"></td>
+                                <td class="value-cell"><input type="text" id="doc-number" name="doc_number" class="form-input"></td>
                             </tr>
                         </table>
                         <h1 class="doc-title">Intake Report (구조 요청 신청서)</h1>
@@ -80,7 +77,7 @@
                     </div>
 
                     <h2 class="section-title">1. 구조 대상자 개요</h2>
-                    <p class="required-notice">* 부분은 꼭 작성 부탁드립니다. (연락처 작성 부탁드립니다. 연락처 없으면 구조진행이 불가능합니다.)</p>
+                    <p class="required-notice">* 부분은 꼭 작성 부탁드립니다.</p>
 
                     <!-- 인적사항 -->
                     <table class="data-table">
@@ -132,219 +129,182 @@
                         </tr>
                     </table>
 
-                    <!-- 가족사항 -->
-                    <table class="data-table family-table">
-                        <tr>
-                            <td rowspan="3" class="section-label"><span class="required">* 가족사항</span></td>
-                            <td class="label-cell header">성명</td>
-                            <td class="label-cell header">관계</td>
-                            <td class="label-cell header">나이</td>
-                            <td class="label-cell header">상세내용</td>
-                            <td class="label-cell header">연락처</td>
-                        </tr>
-                        <tr class="family-row">
-                            <td data-label="성명"><input type="text" name="family1_name" class="form-input" placeholder="성명"></td>
-                            <td data-label="관계"><input type="text" name="family1_relation" class="form-input" placeholder="관계"></td>
-                            <td data-label="나이"><input type="text" name="family1_age" class="form-input" placeholder="나이"></td>
-                            <td data-label="상세내용"><input type="text" name="family1_detail" class="form-input" placeholder="상세내용"></td>
-                            <td data-label="연락처"><input type="text" name="family1_contact" class="form-input" placeholder="연락처"></td>
-                        </tr>
-                        <tr class="family-row">
-                            <td data-label="성명"><input type="text" name="family2_name" class="form-input" placeholder="성명"></td>
-                            <td data-label="관계"><input type="text" name="family2_relation" class="form-input" placeholder="관계"></td>
-                            <td data-label="나이"><input type="text" name="family2_age" class="form-input" placeholder="나이"></td>
-                            <td data-label="상세내용"><input type="text" name="family2_detail" class="form-input" placeholder="상세내용"></td>
-                            <td data-label="연락처"><input type="text" name="family2_contact" class="form-input" placeholder="연락처"></td>
-                        </tr>
-                    </table>
+                    <!-- 가족사항 (동적) -->
+                    <div class="dynamic-section">
+                        <div class="section-header-row">
+                            <span class="section-label-inline"><span class="required">* 가족사항</span></span>
+                            <button type="button" class="btn-add" onclick="addFamilyRow()">+ 추가</button>
+                        </div>
+                        <table class="data-table" id="family-table">
+                            <thead>
+                                <tr>
+                                    <th class="label-cell">성명</th>
+                                    <th class="label-cell">관계</th>
+                                    <th class="label-cell">나이</th>
+                                    <th class="label-cell">상세내용</th>
+                                    <th class="label-cell">연락처</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="family-rows">
+                                <tr>
+                                    <td><input type="text" name="family_name[]" class="form-input"></td>
+                                    <td><input type="text" name="family_relation[]" class="form-input"></td>
+                                    <td><input type="text" name="family_age[]" class="form-input"></td>
+                                    <td><input type="text" name="family_detail[]" class="form-input"></td>
+                                    <td><input type="text" name="family_contact[]" class="form-input"></td>
+                                    <td><button type="button" class="btn-remove" onclick="removeFamilyRow(this)">-</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
-                    <!-- 구조 예산안 -->
+                    <!-- 구조 예산안 (동적) -->
                     <h2 class="section-title">구조 예산안</h2>
-                    <table class="data-table budget-table">
-                        <thead>
-                            <tr>
-                                <td class="label-cell header">세부항목</td>
-                                <td class="label-cell header">산출근거</td>
-                                <td class="label-cell header">금액</td>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td data-label="세부항목"><input type="text" name="budget1_item" class="form-input" placeholder="세부항목"></td>
-                                <td data-label="산출근거"><input type="text" name="budget1_basis" class="form-input" placeholder="산출근거"></td>
-                                <td data-label="금액"><input type="text" name="budget1_amount" class="form-input" placeholder="금액"></td>
-                            </tr>
-                            <tr>
-                                <td data-label="세부항목"><input type="text" name="budget2_item" class="form-input" placeholder="세부항목"></td>
-                                <td data-label="산출근거"><input type="text" name="budget2_basis" class="form-input" placeholder="산출근거"></td>
-                                <td data-label="금액"><input type="text" name="budget2_amount" class="form-input" placeholder="금액"></td>
-                            </tr>
-                            <tr>
-                                <td colspan="2" class="label-cell">합계</td>
-                                <td data-label="합계 금액"><input type="text" name="budget_total" class="form-input" placeholder="합계 금액"></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class="dynamic-section">
+                        <div class="section-header-row">
+                            <span></span>
+                            <button type="button" class="btn-add" onclick="addBudgetRow()">+ 추가</button>
+                        </div>
+                        <table class="data-table budget-table" id="budget-table">
+                            <thead>
+                                <tr>
+                                    <th class="label-cell">세부항목</th>
+                                    <th class="label-cell">산출근거</th>
+                                    <th class="label-cell">금액</th>
+                                    <th class="col-action"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="budget-rows">
+                                <tr>
+                                    <td><input type="text" name="budget_item[]" class="form-input"></td>
+                                    <td><input type="text" name="budget_basis[]" class="form-input"></td>
+                                    <td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td>
+                                    <td><button type="button" class="btn-remove" onclick="removeBudgetRow(this)">-</button></td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="2" class="label-cell">합계</td>
+                                    <td><input type="text" id="budget-total" name="budget_total" class="form-input" readonly></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
 
-                    <!-- 여권/신분증 사진 -->
-                    <h2 class="section-title">여권, 신분증 사진 (있으신 분들은 첨부파일로 꼭 올려주세요)</h2>
-                    <div class="file-upload-area">
+                    <h2 class="section-title section-divider">2. 세부사항</h2>
+
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title"><span class="required">* 현지 생활 현황</span></span></div>
+                        <textarea name="local_life" class="form-textarea"></textarea>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title"><span class="required">* 건강상태</span></span></div>
+                        <textarea name="health_status" class="form-textarea"></textarea>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title"><span class="required">* 귀국 후 계획</span></span></div>
+                        <textarea name="return_plan" class="form-textarea"></textarea>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title"><span class="required">* 사례 접수 경위</span></span></div>
+                        <textarea name="case_history" class="form-textarea"></textarea>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title">전문가 의견</span></div>
+                        <textarea name="expert_opinion" class="form-textarea"></textarea>
+                    </div>
+
+                    <!-- 파일 업로드 -->
+                    <h2 class="section-title">첨부파일</h2>
+                    <div class="file-upload-area compact">
                         <div class="upload-zone" id="upload-zone">
-                            <input type="file" id="file-input" name="attachments" multiple accept="image/*,.pdf,.doc,.docx">
+                            <input type="file" id="file-input" multiple accept="image/*,.pdf,.doc,.docx">
                             <div class="upload-placeholder">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="17 8 12 3 7 8"></polyline>
-                                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                                </svg>
-                                <p>파일을 드래그하거나 클릭하여 업로드</p>
-                                <small>이미지, PDF, Word 문서 가능</small>
+                                <span>파일을 드래그하거나 클릭하여 업로드 (최대 10MB)</span>
                             </div>
                         </div>
-                        <div id="file-preview" class="file-preview"></div>
-                    </div>
-
-                    <!-- 2. 세부사항 -->
-                    <h2 class="section-title section-divider">2. 세부사항</h2>
-                    <p class="required-notice">* 면담 및 담당자 의견에 대해서 상세히 작성해 주셔야 구조에 도움이 됩니다.</p>
-
-                    <div class="detail-section">
-                        <div class="detail-header">
-                            <span class="detail-title"><span class="required">* 현지 생활 현황</span></span>
-                            <span class="detail-desc">한국에서 해외로 출국한 사유, 사건 배경, 가족들과의 관계, 생활 환경 등</span>
+                        <div class="upload-progress hidden" id="upload-progress">
+                            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+                            <span class="progress-text" id="progress-text">0%</span>
                         </div>
-                        <textarea name="local_life" class="form-textarea" rows="4" required></textarea>
-                    </div>
-
-                    <div class="detail-section">
-                        <div class="detail-header">
-                            <span class="detail-title"><span class="required">* 건강상태</span></span>
-                            <span class="detail-desc">현재 건강상태, 질병(병명, 증상, 복용약), 음주, 흡연, 정신적 어려움 등</span>
-                        </div>
-                        <textarea name="health_status" class="form-textarea" rows="4" required></textarea>
-                    </div>
-
-                    <div class="detail-section">
-                        <div class="detail-header">
-                            <span class="detail-title"><span class="required">* 귀국 후 계획</span></span>
-                            <span class="detail-desc">과거직업 및 경력 그리고 귀국 후 희망 직종 및 취득 기술 등 원하는 시설 입소 등</span>
-                        </div>
-                        <textarea name="return_plan" class="form-textarea" rows="4" required></textarea>
-                    </div>
-
-                    <div class="detail-section">
-                        <div class="detail-header">
-                            <span class="detail-title"><span class="required">*사례 접수 경위 및 구조 요청 현황</span></span>
-                            <span class="detail-desc">구조단을 알게 된 경위와 구조요청 및 인계까지의 자세한 상황 서술 (대사관, 영사관, 한인회 협력 내용, 6하 원칙)</span>
-                        </div>
-                        <textarea name="case_history" class="form-textarea" rows="4" required></textarea>
-                    </div>
-
-                    <div class="detail-section">
-                        <div class="detail-header">
-                            <span class="detail-title">전문가 및 담당자 기타 의견</span>
-                            <span class="detail-desc">사회복지사, 의사, 협력기관, 대사관, 영사관, 한인회 등 담당자 의견</span>
-                        </div>
-                        <textarea name="expert_opinion" class="form-textarea" rows="4"></textarea>
+                        <div class="file-preview-grid" id="file-preview"></div>
                     </div>
                 </div>
 
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-submit">제출하기</button>
+                <div class="form-actions no-print">
                     <button type="button" id="cancel-btn" class="btn btn-cancel">취소</button>
+                    <button type="submit" id="submit-btn" class="btn btn-submit">등록</button>
                 </div>
             </form>
         </section>
 
         <!-- 게시글 보기 -->
         <section id="view-post" class="form-section hidden">
-            <div class="form-header">
+            <div class="form-header no-print">
                 <h2>구조 요청 신청서</h2>
                 <button id="back-to-list-view" class="btn btn-back">← 목록으로</button>
             </div>
-            <div class="post-actions">
-                <button id="edit-post-btn" class="btn btn-edit">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                    수정
-                </button>
-                <button id="delete-post-btn" class="btn btn-delete">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                    삭제
-                </button>
-                <button id="print-post-btn" class="btn btn-print">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                        <rect x="6" y="14" width="12" height="8"></rect>
-                    </svg>
-                    인쇄
-                </button>
+            <div class="post-actions no-print">
+                <button id="edit-post-btn" class="btn btn-edit">수정</button>
+                <button id="delete-post-btn" class="btn btn-delete">삭제</button>
+                <button id="print-post-btn" class="btn btn-print">인쇄</button>
+                <button id="pdf-post-btn" class="btn btn-pdf">PDF 저장</button>
             </div>
-            <div id="post-content" class="post-content">
-                <!-- 게시글 내용이 여기에 동적으로 표시됩니다 -->
-            </div>
+            <div id="post-content"></div>
         </section>
     </div>
 
-    <!-- 비밀번호 입력 모달 -->
+    <!-- 모달들 -->
     <div id="password-modal" class="modal hidden">
         <div class="modal-content">
-            <h3>비밀번호 입력</h3>
-            <p>이 게시글은 비밀글입니다. 비밀번호를 입력해주세요.</p>
-            <input type="password" id="modal-password" placeholder="비밀번호">
+            <h3>비밀번호 확인</h3>
+            <p>게시글 비밀번호를 입력하세요.</p>
+            <input type="password" id="modal-password">
             <div class="modal-actions">
-                <button id="modal-submit" class="btn btn-submit">확인</button>
                 <button id="modal-cancel" class="btn btn-cancel">취소</button>
+                <button id="modal-submit" class="btn btn-submit">확인</button>
             </div>
         </div>
     </div>
 
-    <!-- 관리자 로그인 모달 -->
     <div id="admin-modal" class="modal hidden">
         <div class="modal-content">
             <h3>관리자 로그인</h3>
-            <p>관리자 비밀번호를 입력해주세요.</p>
-            <input type="password" id="admin-password" placeholder="관리자 비밀번호">
+            <p>관리자 비밀번호를 입력하세요.</p>
+            <input type="password" id="admin-password">
             <div class="modal-actions">
-                <button id="admin-submit" class="btn btn-submit">로그인</button>
                 <button id="admin-cancel" class="btn btn-cancel">취소</button>
+                <button id="admin-submit" class="btn btn-submit">로그인</button>
             </div>
         </div>
     </div>
 
-    <!-- 삭제 확인 모달 -->
     <div id="delete-modal" class="modal hidden">
         <div class="modal-content">
             <h3>게시글 삭제</h3>
-            <p>정말 이 게시글을 삭제하시겠습니까?<br>삭제 후에는 복구할 수 없습니다.</p>
-            <input type="password" id="delete-password" placeholder="게시글 비밀번호">
+            <p>비밀번호를 입력하세요.</p>
+            <input type="password" id="delete-password">
             <div class="modal-actions">
-                <button id="delete-confirm" class="btn btn-delete">삭제</button>
                 <button id="delete-cancel" class="btn btn-cancel">취소</button>
+                <button id="delete-confirm" class="btn btn-delete">삭제</button>
             </div>
         </div>
     </div>
 
-    <!-- 수정 비밀번호 모달 -->
     <div id="edit-modal" class="modal hidden">
         <div class="modal-content">
             <h3>게시글 수정</h3>
-            <p>게시글을 수정하려면 비밀번호를 입력해주세요.</p>
-            <input type="password" id="edit-password" placeholder="게시글 비밀번호">
+            <p>비밀번호를 입력하세요.</p>
+            <input type="password" id="edit-password">
             <div class="modal-actions">
-                <button id="edit-confirm" class="btn btn-submit">확인</button>
                 <button id="edit-cancel" class="btn btn-cancel">취소</button>
+                <button id="edit-confirm" class="btn btn-submit">수정</button>
             </div>
         </div>
     </div>
 
-    <!-- 로딩 오버레이 -->
     <div id="loading-overlay" class="loading-overlay hidden">
         <div class="spinner"></div>
         <p>처리 중...</p>

@@ -4,25 +4,99 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const supabase = {
     async fetch(endpoint, options = {}) {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+        return await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
             ...options,
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': options.prefer || 'return=representation', ...options.headers }
         });
+    },
+    async uploadFile(file, path) {
+        const res = await fetch(`${SUPABASE_URL}/storage/v1/object/attachments/${path}`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': file.type },
+            body: file
+        });
         return res;
+    },
+    getFileUrl(path) {
+        return `${SUPABASE_URL}/storage/v1/object/public/attachments/${path}`;
     }
 };
 
-const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, selectedFiles: [], currentPostId: null, isEditing: false, editingPostId: null };
+const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, selectedFiles: [], currentPostId: null, isEditing: false, editingPostId: null, uploadProgress: 0 };
 let elements = {};
 
 function initElements() {
-    elements = { boardList: document.getElementById('board-list'), writeForm: document.getElementById('write-form'), viewPost: document.getElementById('view-post'), postList: document.getElementById('post-list'), pagination: document.getElementById('pagination'), writeBtn: document.getElementById('write-btn'), adminBtn: document.getElementById('admin-btn'), backToList: document.getElementById('back-to-list'), backToListView: document.getElementById('back-to-list-view'), cancelBtn: document.getElementById('cancel-btn'), rescueForm: document.getElementById('rescue-form'), postContent: document.getElementById('post-content'), passwordModal: document.getElementById('password-modal'), adminModal: document.getElementById('admin-modal'), deleteModal: document.getElementById('delete-modal'), editModal: document.getElementById('edit-modal'), loadingOverlay: document.getElementById('loading-overlay'), uploadZone: document.getElementById('upload-zone'), fileInput: document.getElementById('file-input'), filePreview: document.getElementById('file-preview'), docNumber: document.getElementById('doc-number'), writeDate: document.getElementById('write-date'), editPostBtn: document.getElementById('edit-post-btn'), deletePostBtn: document.getElementById('delete-post-btn'), printPostBtn: document.getElementById('print-post-btn') };
+    elements = {
+        boardList: document.getElementById('board-list'),
+        writeForm: document.getElementById('write-form'),
+        viewPost: document.getElementById('view-post'),
+        postList: document.getElementById('post-list'),
+        pagination: document.getElementById('pagination'),
+        writeBtn: document.getElementById('write-btn'),
+        adminBtn: document.getElementById('admin-btn'),
+        csvBtn: document.getElementById('csv-download-btn'),
+        backToList: document.getElementById('back-to-list'),
+        backToListView: document.getElementById('back-to-list-view'),
+        cancelBtn: document.getElementById('cancel-btn'),
+        submitBtn: document.getElementById('submit-btn'),
+        rescueForm: document.getElementById('rescue-form'),
+        postContent: document.getElementById('post-content'),
+        passwordModal: document.getElementById('password-modal'),
+        adminModal: document.getElementById('admin-modal'),
+        deleteModal: document.getElementById('delete-modal'),
+        editModal: document.getElementById('edit-modal'),
+        loadingOverlay: document.getElementById('loading-overlay'),
+        uploadZone: document.getElementById('upload-zone'),
+        fileInput: document.getElementById('file-input'),
+        filePreview: document.getElementById('file-preview'),
+        uploadProgress: document.getElementById('upload-progress'),
+        progressFill: document.getElementById('progress-fill'),
+        progressText: document.getElementById('progress-text'),
+        docNumber: document.getElementById('doc-number'),
+        writeDate: document.getElementById('write-date'),
+        editPostBtn: document.getElementById('edit-post-btn'),
+        deletePostBtn: document.getElementById('delete-post-btn'),
+        printPostBtn: document.getElementById('print-post-btn'),
+        pdfPostBtn: document.getElementById('pdf-post-btn'),
+        kstClock: document.getElementById('kst-clock'),
+        familyRows: document.getElementById('family-rows'),
+        budgetRows: document.getElementById('budget-rows'),
+        budgetTotal: document.getElementById('budget-total')
+    };
 }
 
-document.addEventListener('DOMContentLoaded', () => { initElements(); loadPosts(); loadAdminPassword(); setupEventListeners(); setCurrentDate(); });
+document.addEventListener('DOMContentLoaded', () => {
+    initElements();
+    loadPosts();
+    loadAdminPassword();
+    setupEventListeners();
+    setCurrentDate();
+    startKSTClock();
+});
 
 async function loadAdminPassword() {
-    try { const res = await supabase.fetch('admin?select=password&limit=1'); const data = await res.json(); if (data && data.length > 0) state.adminPassword = data[0].password; } catch (e) { console.error(e); }
+    try {
+        const res = await supabase.fetch('admin?select=password&limit=1');
+        const data = await res.json();
+        if (data && data.length > 0) state.adminPassword = data[0].password;
+    } catch (e) { console.error(e); }
+}
+
+function startKSTClock() {
+    const update = () => {
+        const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        elements.kstClock.textContent = `KST ${now}`;
+    };
+    update();
+    setInterval(update, 1000);
+}
+
+function getKSTDate() {
+    return new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
+}
+
+function setCurrentDate() {
+    elements.writeDate.textContent = getKSTDate();
 }
 
 function setupEventListeners() {
@@ -32,6 +106,7 @@ function setupEventListeners() {
     elements.cancelBtn.addEventListener('click', showBoardList);
     elements.rescueForm.addEventListener('submit', handleSubmit);
     elements.adminBtn.addEventListener('click', showAdminModal);
+    elements.csvBtn?.addEventListener('click', downloadCSV);
     document.getElementById('admin-submit').addEventListener('click', handleAdminLogin);
     document.getElementById('admin-cancel').addEventListener('click', hideAdminModal);
     document.getElementById('modal-submit').addEventListener('click', handlePasswordSubmit);
@@ -40,31 +115,36 @@ function setupEventListeners() {
     document.getElementById('delete-cancel').addEventListener('click', hideDeleteModal);
     document.getElementById('edit-confirm').addEventListener('click', handleEditConfirm);
     document.getElementById('edit-cancel').addEventListener('click', hideEditModal);
-    if (elements.editPostBtn) elements.editPostBtn.addEventListener('click', (e) => { e.preventDefault(); showEditModal(); });
-    if (elements.deletePostBtn) elements.deletePostBtn.addEventListener('click', (e) => { e.preventDefault(); showDeleteModal(); });
-    if (elements.printPostBtn) elements.printPostBtn.addEventListener('click', (e) => { e.preventDefault(); window.print(); });
+    elements.editPostBtn?.addEventListener('click', (e) => { e.preventDefault(); showEditModal(); });
+    elements.deletePostBtn?.addEventListener('click', (e) => { e.preventDefault(); showDeleteModal(); });
+    elements.printPostBtn?.addEventListener('click', (e) => { e.preventDefault(); window.print(); });
+    elements.pdfPostBtn?.addEventListener('click', (e) => { e.preventDefault(); generatePDF(); });
     elements.uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); elements.uploadZone.classList.add('dragover'); });
     elements.uploadZone.addEventListener('dragleave', (e) => { e.preventDefault(); elements.uploadZone.classList.remove('dragover'); });
     elements.uploadZone.addEventListener('drop', (e) => { e.preventDefault(); elements.uploadZone.classList.remove('dragover'); processFiles(Array.from(e.dataTransfer.files)); });
     elements.fileInput.addEventListener('change', (e) => processFiles(Array.from(e.target.files)));
-    document.getElementById('modal-password').addEventListener('keypress', (e) => { if (e.key === 'Enter') handlePasswordSubmit(); });
-    document.getElementById('admin-password').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleAdminLogin(); });
-    document.getElementById('delete-password').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleDeleteConfirm(); });
-    document.getElementById('edit-password').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleEditConfirm(); });
+    ['modal-password', 'admin-password', 'delete-password', 'edit-password'].forEach(id => {
+        document.getElementById(id)?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById(id.replace('-password', '-submit') || id.replace('-password', '-confirm'))?.click();
+        });
+    });
 }
 
-function setCurrentDate() { elements.writeDate.textContent = new Date().toISOString().split('T')[0]; }
-
 async function loadPosts() {
-    try { const res = await supabase.fetch('posts?select=*&order=created_at.desc'); state.posts = await res.json() || []; } catch (e) { state.posts = []; }
+    try {
+        const res = await supabase.fetch('posts?select=*&order=created_at.desc');
+        state.posts = await res.json() || [];
+    } catch (e) { state.posts = []; }
     renderPosts();
 }
 
 function renderPosts() {
     const start = (state.currentPage - 1) * state.postsPerPage, end = start + state.postsPerPage;
     elements.postList.innerHTML = state.posts.slice(start, end).map((post, i) => {
-        const country = post.country ? `[${post.country}]` : '', author = state.isAdmin ? (post.data?.name || '익명') : '익명', date = post.created_at ? post.created_at.split('T')[0] : '';
-        return `<tr data-id="${post.id}"><td class="col-no" style="text-align:center">${state.posts.length - start - i}</td><td class="col-title"><div class="post-title"><svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>${country} 구조요청</span></div></td><td class="col-author">${escapeHtml(author)}</td><td class="col-date">${date}</td></tr>`;
+        const country = post.country ? `[${post.country}]` : '';
+        const author = state.isAdmin ? (post.data?.name || '익명') : '익명';
+        const date = post.created_at ? new Date(post.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+        return `<tr data-id="${post.id}"><td class="col-no" style="text-align:center">${state.posts.length - start - i}</td><td class="col-title"><div class="post-title"><svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>${country} 구조요청</span></div></td><td class="col-author">${escapeHtml(author)}</td><td class="col-date">${date}</td></tr>`;
     }).join('');
     elements.postList.querySelectorAll('tr').forEach(row => row.addEventListener('click', () => handlePostClick(row.dataset.id)));
     renderPagination();
@@ -80,74 +160,329 @@ function renderPagination() {
     elements.pagination.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => { state.currentPage = parseInt(btn.dataset.page); renderPosts(); }));
 }
 
-function showBoardList() { elements.boardList.classList.remove('hidden'); elements.writeForm.classList.add('hidden'); elements.viewPost.classList.add('hidden'); loadPosts(); window.scrollTo(0, 0); }
-function showWriteForm() { elements.boardList.classList.add('hidden'); elements.writeForm.classList.remove('hidden'); elements.viewPost.classList.add('hidden'); state.isEditing = false; state.editingPostId = null; elements.writeForm.querySelector('.form-header h2').textContent = '구조 요청 신청서 작성'; resetForm(); elements.docNumber.value = ''; setCurrentDate(); window.scrollTo(0, 0); }
-function showViewPost(post) { elements.boardList.classList.add('hidden'); elements.writeForm.classList.add('hidden'); elements.viewPost.classList.remove('hidden'); state.currentPostId = post.id; renderPostContent(post); window.scrollTo(0, 0); }
-function resetForm() { elements.rescueForm.reset(); state.selectedFiles = []; elements.filePreview.innerHTML = ''; }
-function handlePostClick(postId) { state.currentPostId = postId; const post = state.posts.find(p => p.id === postId); if (!post) return; state.isAdmin ? showViewPost(post) : showPasswordModal(); }
-function showPasswordModal() { elements.passwordModal.classList.remove('hidden'); document.getElementById('modal-password').value = ''; document.getElementById('modal-password').focus(); }
-function hidePasswordModal() { elements.passwordModal.classList.add('hidden'); state.currentPostId = null; }
-function handlePasswordSubmit() { const pw = document.getElementById('modal-password').value, post = state.posts.find(p => p.id === state.currentPostId); if (!post) { hidePasswordModal(); return; } if (pw === post.password || pw === state.adminPassword) { hidePasswordModal(); showViewPost(post); } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('modal-password').value = ''; } }
-function showAdminModal() { if (state.isAdmin) { state.isAdmin = false; elements.adminBtn.textContent = '관리자 로그인'; elements.adminBtn.classList.remove('logged-in'); renderPosts(); alert('로그아웃 되었습니다.'); return; } elements.adminModal.classList.remove('hidden'); document.getElementById('admin-password').value = ''; document.getElementById('admin-password').focus(); }
-function hideAdminModal() { elements.adminModal.classList.add('hidden'); }
-function handleAdminLogin() { const pw = document.getElementById('admin-password').value; if (pw === state.adminPassword) { state.isAdmin = true; elements.adminBtn.textContent = '관리자 로그아웃'; elements.adminBtn.classList.add('logged-in'); hideAdminModal(); renderPosts(); alert('관리자로 로그인되었습니다.'); } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('admin-password').value = ''; } }
-function showDeleteModal() { elements.deleteModal.classList.remove('hidden'); document.getElementById('delete-password').value = ''; document.getElementById('delete-password').focus(); }
-function hideDeleteModal() { elements.deleteModal.classList.add('hidden'); }
-async function handleDeleteConfirm() { const pw = document.getElementById('delete-password').value, post = state.posts.find(p => p.id === state.currentPostId); if (!post) { hideDeleteModal(); return; } if (pw === post.password || pw === state.adminPassword) { showLoading(); await supabase.fetch(`posts?id=eq.${state.currentPostId}`, { method: 'DELETE' }); hideDeleteModal(); hideLoading(); alert('삭제되었습니다.'); showBoardList(); } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('delete-password').value = ''; } }
-function showEditModal() { elements.editModal.classList.remove('hidden'); document.getElementById('edit-password').value = ''; document.getElementById('edit-password').focus(); }
-function hideEditModal() { elements.editModal.classList.add('hidden'); }
-function handleEditConfirm() { const pw = document.getElementById('edit-password').value, post = state.posts.find(p => p.id === state.currentPostId); if (!post) { hideEditModal(); return; } if (pw === post.password || pw === state.adminPassword) { hideEditModal(); state.isEditing = true; state.editingPostId = state.currentPostId; showEditForm(post); } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('edit-password').value = ''; } }
-function showEditForm(post) {
-    elements.boardList.classList.add('hidden'); elements.viewPost.classList.add('hidden'); elements.writeForm.classList.remove('hidden');
-    elements.writeForm.querySelector('.form-header h2').textContent = '구조 요청 신청서 수정';
-    elements.docNumber.value = post.doc_number || ''; elements.writeDate.textContent = post.created_at ? post.created_at.split('T')[0] : '';
-    document.getElementById('password').value = post.password;
-    const d = post.data, fields = ['position','country_city','name','illegal_reason','contact','illegal_period','current_address','korea_address','recommender_name','recommender_contact','recommender_org','recommender_email','recommender_address','family1_name','family1_relation','family1_age','family1_detail','family1_contact','family2_name','family2_relation','family2_age','family2_detail','family2_contact','budget1_item','budget1_basis','budget1_amount','budget2_item','budget2_basis','budget2_amount','budget_total','local_life','health_status','return_plan','case_history','expert_opinion'];
-    fields.forEach(n => { const f = document.querySelector(`[name="${n}"]`); if (f) f.value = d[n] || ''; });
-    state.selectedFiles = post.attachments ? [...post.attachments] : []; renderFilePreview(); window.scrollTo(0, 0);
+function showBoardList() {
+    elements.boardList.classList.remove('hidden');
+    elements.writeForm.classList.add('hidden');
+    elements.viewPost.classList.add('hidden');
+    loadPosts();
+    window.scrollTo(0, 0);
 }
 
-function processFiles(files) {
-    files.forEach(file => {
-        if (file.size > 10 * 1024 * 1024) { alert('파일이 너무 큽니다. (최대 10MB)'); return; }
+function showWriteForm() {
+    elements.boardList.classList.add('hidden');
+    elements.writeForm.classList.remove('hidden');
+    elements.viewPost.classList.add('hidden');
+    state.isEditing = false;
+    state.editingPostId = null;
+    elements.writeForm.querySelector('.form-header h2').textContent = '구조 요청 신청서 작성';
+    resetForm();
+    setCurrentDate();
+    window.scrollTo(0, 0);
+}
+
+function showViewPost(post) {
+    elements.boardList.classList.add('hidden');
+    elements.writeForm.classList.add('hidden');
+    elements.viewPost.classList.remove('hidden');
+    state.currentPostId = post.id;
+    renderPostContent(post);
+    window.scrollTo(0, 0);
+}
+
+function resetForm() {
+    elements.rescueForm.reset();
+    state.selectedFiles = [];
+    elements.filePreview.innerHTML = '';
+    elements.uploadProgress.classList.add('hidden');
+    elements.docNumber.value = '';
+    elements.familyRows.innerHTML = '<tr><td><input type="text" name="family_name[]" class="form-input"></td><td><input type="text" name="family_relation[]" class="form-input"></td><td><input type="text" name="family_age[]" class="form-input"></td><td><input type="text" name="family_detail[]" class="form-input"></td><td><input type="text" name="family_contact[]" class="form-input"></td><td><button type="button" class="btn-remove" onclick="removeFamilyRow(this)">-</button></td></tr>';
+    elements.budgetRows.innerHTML = '<tr><td><input type="text" name="budget_item[]" class="form-input"></td><td><input type="text" name="budget_basis[]" class="form-input"></td><td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td><td><button type="button" class="btn-remove" onclick="removeBudgetRow(this)">-</button></td></tr>';
+    elements.budgetTotal.value = '';
+    elements.submitBtn.disabled = false;
+}
+
+function handlePostClick(postId) {
+    state.currentPostId = postId;
+    const post = state.posts.find(p => p.id === postId);
+    if (!post) return;
+    state.isAdmin ? showViewPost(post) : showPasswordModal();
+}
+
+function showPasswordModal() { elements.passwordModal.classList.remove('hidden'); document.getElementById('modal-password').value = ''; document.getElementById('modal-password').focus(); }
+function hidePasswordModal() { elements.passwordModal.classList.add('hidden'); }
+function handlePasswordSubmit() {
+    const pw = document.getElementById('modal-password').value;
+    const post = state.posts.find(p => p.id === state.currentPostId);
+    if (!post) { hidePasswordModal(); return; }
+    if (pw === post.password || pw === state.adminPassword) { hidePasswordModal(); showViewPost(post); }
+    else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('modal-password').value = ''; }
+}
+
+function showAdminModal() {
+    if (state.isAdmin) {
+        state.isAdmin = false;
+        elements.adminBtn.textContent = '관리자 로그인';
+        elements.adminBtn.classList.remove('logged-in');
+        elements.csvBtn.classList.add('hidden');
+        elements.kstClock.classList.add('hidden');
+        renderPosts();
+        alert('로그아웃 되었습니다.');
+        return;
+    }
+    elements.adminModal.classList.remove('hidden');
+    document.getElementById('admin-password').value = '';
+    document.getElementById('admin-password').focus();
+}
+function hideAdminModal() { elements.adminModal.classList.add('hidden'); }
+function handleAdminLogin() {
+    const pw = document.getElementById('admin-password').value;
+    if (pw === state.adminPassword) {
+        state.isAdmin = true;
+        elements.adminBtn.textContent = '관리자 로그아웃';
+        elements.adminBtn.classList.add('logged-in');
+        elements.csvBtn.classList.remove('hidden');
+        elements.kstClock.classList.remove('hidden');
+        hideAdminModal();
+        renderPosts();
+        alert('관리자로 로그인되었습니다.');
+    } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('admin-password').value = ''; }
+}
+
+function showDeleteModal() { elements.deleteModal.classList.remove('hidden'); document.getElementById('delete-password').value = ''; document.getElementById('delete-password').focus(); }
+function hideDeleteModal() { elements.deleteModal.classList.add('hidden'); }
+async function handleDeleteConfirm() {
+    const pw = document.getElementById('delete-password').value;
+    const post = state.posts.find(p => p.id === state.currentPostId);
+    if (!post) { hideDeleteModal(); return; }
+    if (pw === post.password || pw === state.adminPassword) {
+        showLoading();
+        await supabase.fetch(`posts?id=eq.${state.currentPostId}`, { method: 'DELETE' });
+        hideDeleteModal(); hideLoading();
+        alert('삭제되었습니다.');
+        showBoardList();
+    } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('delete-password').value = ''; }
+}
+
+function showEditModal() { elements.editModal.classList.remove('hidden'); document.getElementById('edit-password').value = ''; document.getElementById('edit-password').focus(); }
+function hideEditModal() { elements.editModal.classList.add('hidden'); }
+function handleEditConfirm() {
+    const pw = document.getElementById('edit-password').value;
+    const post = state.posts.find(p => p.id === state.currentPostId);
+    if (!post) { hideEditModal(); return; }
+    if (pw === post.password || pw === state.adminPassword) {
+        hideEditModal();
+        state.isEditing = true;
+        state.editingPostId = state.currentPostId;
+        showEditForm(post);
+    } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('edit-password').value = ''; }
+}
+
+function showEditForm(post) {
+    elements.boardList.classList.add('hidden');
+    elements.viewPost.classList.add('hidden');
+    elements.writeForm.classList.remove('hidden');
+    elements.writeForm.querySelector('.form-header h2').textContent = '구조 요청 신청서 수정';
+    elements.docNumber.value = post.doc_number || '';
+    elements.writeDate.textContent = post.created_at ? new Date(post.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }).split(' ')[0] : getKSTDate();
+    document.getElementById('password').value = post.password;
+    const d = post.data;
+    ['position','country_city','name','illegal_reason','contact','illegal_period','current_address','korea_address','recommender_name','recommender_contact','recommender_org','recommender_email','recommender_address','local_life','health_status','return_plan','case_history','expert_opinion'].forEach(n => {
+        const f = document.querySelector(`[name="${n}"]`); if (f) f.value = d[n] || '';
+    });
+    // 가족 행 복원
+    const families = d.families || [];
+    elements.familyRows.innerHTML = '';
+    (families.length ? families : [{}]).forEach(fam => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><input type="text" name="family_name[]" class="form-input" value="${escapeHtml(fam.name||'')}"></td><td><input type="text" name="family_relation[]" class="form-input" value="${escapeHtml(fam.relation||'')}"></td><td><input type="text" name="family_age[]" class="form-input" value="${escapeHtml(fam.age||'')}"></td><td><input type="text" name="family_detail[]" class="form-input" value="${escapeHtml(fam.detail||'')}"></td><td><input type="text" name="family_contact[]" class="form-input" value="${escapeHtml(fam.contact||'')}"></td><td><button type="button" class="btn-remove" onclick="removeFamilyRow(this)">-</button></td>`;
+        elements.familyRows.appendChild(tr);
+    });
+    // 예산 행 복원
+    const budgets = d.budgets || [];
+    elements.budgetRows.innerHTML = '';
+    (budgets.length ? budgets : [{}]).forEach(b => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><input type="text" name="budget_item[]" class="form-input" value="${escapeHtml(b.item||'')}"></td><td><input type="text" name="budget_basis[]" class="form-input" value="${escapeHtml(b.basis||'')}"></td><td><input type="text" name="budget_amount[]" class="form-input" value="${escapeHtml(b.amount||'')}" oninput="calcBudgetTotal()"></td><td><button type="button" class="btn-remove" onclick="removeBudgetRow(this)">-</button></td>`;
+        elements.budgetRows.appendChild(tr);
+    });
+    elements.budgetTotal.value = d.budget_total || '';
+    state.selectedFiles = post.attachments || [];
+    renderFilePreview();
+    window.scrollTo(0, 0);
+}
+
+// 동적 행 추가/삭제
+function addFamilyRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td><input type="text" name="family_name[]" class="form-input"></td><td><input type="text" name="family_relation[]" class="form-input"></td><td><input type="text" name="family_age[]" class="form-input"></td><td><input type="text" name="family_detail[]" class="form-input"></td><td><input type="text" name="family_contact[]" class="form-input"></td><td><button type="button" class="btn-remove" onclick="removeFamilyRow(this)">-</button></td>';
+    elements.familyRows.appendChild(tr);
+}
+function removeFamilyRow(btn) {
+    if (elements.familyRows.querySelectorAll('tr').length > 1) btn.closest('tr').remove();
+    else alert('최소 1개의 행이 필요합니다.');
+}
+function addBudgetRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td><input type="text" name="budget_item[]" class="form-input"></td><td><input type="text" name="budget_basis[]" class="form-input"></td><td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td><td><button type="button" class="btn-remove" onclick="removeBudgetRow(this)">-</button></td>';
+    elements.budgetRows.appendChild(tr);
+}
+function removeBudgetRow(btn) {
+    if (elements.budgetRows.querySelectorAll('tr').length > 1) { btn.closest('tr').remove(); calcBudgetTotal(); }
+    else alert('최소 1개의 행이 필요합니다.');
+}
+function calcBudgetTotal() {
+    let total = 0;
+    document.querySelectorAll('[name="budget_amount[]"]').forEach(input => {
+        const val = parseInt(input.value.replace(/[^0-9]/g, '')) || 0;
+        total += val;
+    });
+    elements.budgetTotal.value = total ? total.toLocaleString() : '';
+}
+
+// 파일 처리
+async function processFiles(files) {
+    for (const file of files) {
+        if (file.size > 10 * 1024 * 1024) { alert(`${file.name}: 10MB 초과`); continue; }
+        let processedFile = file;
+        if (file.type.startsWith('image/')) {
+            processedFile = await compressImage(file);
+        }
+        elements.submitBtn.disabled = true;
+        elements.uploadProgress.classList.remove('hidden');
+        try {
+            const path = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+            await uploadWithProgress(processedFile, path);
+            state.selectedFiles.push({ name: file.name, path: path, url: supabase.getFileUrl(path), type: file.type });
+            renderFilePreview();
+        } catch (e) { alert('업로드 실패: ' + file.name); console.error(e); }
+        elements.uploadProgress.classList.add('hidden');
+        elements.submitBtn.disabled = false;
+    }
+}
+
+async function compressImage(file) {
+    return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = (e) => { state.selectedFiles.push({ name: file.name, type: file.type, data: e.target.result }); renderFilePreview(); };
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                const maxSize = 1920;
+                if (w > maxSize || h > maxSize) {
+                    if (w > h) { h = h * maxSize / w; w = maxSize; }
+                    else { w = w * maxSize / h; h = maxSize; }
+                }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                canvas.toBlob((blob) => resolve(new File([blob], file.name, { type: 'image/jpeg' })), 'image/jpeg', 0.8);
+            };
+            img.src = e.target.result;
+        };
         reader.readAsDataURL(file);
     });
 }
 
+async function uploadWithProgress(file, path) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100);
+                elements.progressFill.style.width = pct + '%';
+                elements.progressText.textContent = pct + '%';
+            }
+        });
+        xhr.addEventListener('load', () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('Upload failed')));
+        xhr.addEventListener('error', () => reject(new Error('Upload error')));
+        xhr.open('POST', `${SUPABASE_URL}/storage/v1/object/attachments/${path}`);
+        xhr.setRequestHeader('apikey', SUPABASE_KEY);
+        xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_KEY}`);
+        xhr.send(file);
+    });
+}
+
 function renderFilePreview() {
-    elements.filePreview.innerHTML = state.selectedFiles.map((file, i) => `<div class="file-item">${file.type.startsWith('image/') ? `<img src="${file.data}" alt="${file.name}">` : `<div style="height:100px;display:flex;align-items:center;justify-content:center;background:#f2f2f2"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>`}<div class="file-name">${escapeHtml(file.name)}</div><button type="button" class="remove-file" onclick="removeFile(${i})">×</button></div>`).join('');
+    elements.filePreview.innerHTML = state.selectedFiles.map((file, i) => {
+        const isImg = file.type?.startsWith('image/');
+        const src = file.url || file.data;
+        return `<div class="file-item">${isImg ? `<img src="${src}" alt="${escapeHtml(file.name)}">` : `<div class="file-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>`}<div class="file-name">${escapeHtml(file.name)}</div><button type="button" class="remove-file" onclick="removeFile(${i})">×</button></div>`;
+    }).join('');
 }
 function removeFile(i) { state.selectedFiles.splice(i, 1); renderFilePreview(); }
 
 async function handleSubmit(e) {
     e.preventDefault();
-    const fd = new FormData(e.target), country = fd.get('country_city'), pw = fd.get('password');
+    const fd = new FormData(e.target);
+    const country = fd.get('country_city'), pw = fd.get('password');
     if (!country || !pw) { alert('국가/도시와 비밀번호는 필수입니다.'); return; }
     showLoading();
-    const data = {}, fields = ['position','country_city','name','illegal_reason','contact','illegal_period','current_address','korea_address','recommender_name','recommender_contact','recommender_org','recommender_email','recommender_address','family1_name','family1_relation','family1_age','family1_detail','family1_contact','family2_name','family2_relation','family2_age','family2_detail','family2_contact','budget1_item','budget1_basis','budget1_amount','budget2_item','budget2_basis','budget2_amount','budget_total','local_life','health_status','return_plan','case_history','expert_opinion'];
-    fields.forEach(k => data[k] = fd.get(k));
+    // 가족 데이터 수집
+    const families = [];
+    const fNames = fd.getAll('family_name[]'), fRels = fd.getAll('family_relation[]'), fAges = fd.getAll('family_age[]'), fDetails = fd.getAll('family_detail[]'), fContacts = fd.getAll('family_contact[]');
+    for (let i = 0; i < fNames.length; i++) {
+        if (fNames[i] || fRels[i] || fAges[i]) families.push({ name: fNames[i], relation: fRels[i], age: fAges[i], detail: fDetails[i], contact: fContacts[i] });
+    }
+    // 예산 데이터 수집
+    const budgets = [];
+    const bItems = fd.getAll('budget_item[]'), bBasis = fd.getAll('budget_basis[]'), bAmounts = fd.getAll('budget_amount[]');
+    for (let i = 0; i < bItems.length; i++) {
+        if (bItems[i] || bBasis[i] || bAmounts[i]) budgets.push({ item: bItems[i], basis: bBasis[i], amount: bAmounts[i] });
+    }
+    const data = {
+        position: fd.get('position'), country_city: fd.get('country_city'), name: fd.get('name'), illegal_reason: fd.get('illegal_reason'), contact: fd.get('contact'), illegal_period: fd.get('illegal_period'), current_address: fd.get('current_address'), korea_address: fd.get('korea_address'),
+        recommender_name: fd.get('recommender_name'), recommender_contact: fd.get('recommender_contact'), recommender_org: fd.get('recommender_org'), recommender_email: fd.get('recommender_email'), recommender_address: fd.get('recommender_address'),
+        families, budgets, budget_total: fd.get('budget_total'),
+        local_life: fd.get('local_life'), health_status: fd.get('health_status'), return_plan: fd.get('return_plan'), case_history: fd.get('case_history'), expert_opinion: fd.get('expert_opinion')
+    };
     try {
         if (state.isEditing && state.editingPostId) {
             await supabase.fetch(`posts?id=eq.${state.editingPostId}`, { method: 'PATCH', body: JSON.stringify({ country, password: pw, doc_number: elements.docNumber.value, data, attachments: state.selectedFiles }) });
-            state.isEditing = false; state.editingPostId = null; alert('수정되었습니다.');
+            state.isEditing = false; state.editingPostId = null;
+            alert('수정되었습니다.');
         } else {
             await supabase.fetch('posts', { method: 'POST', body: JSON.stringify({ country, password: pw, doc_number: elements.docNumber.value, data, attachments: state.selectedFiles }) });
             alert('제출되었습니다.');
         }
         hideLoading(); showBoardList();
-    } catch (err) { hideLoading(); alert('오류가 발생했습니다.'); console.error(err); }
+    } catch (err) { hideLoading(); alert('오류 발생'); console.error(err); }
 }
 
 function renderPostContent(post) {
-    const d = post.data, att = post.attachments?.length > 0 ? `<div class="attachments-section"><h3>첨부파일</h3><div class="attachments-grid">${post.attachments.map((f, i) => `<div class="attachment-item">${f.type.startsWith('image/') ? `<img src="${f.data}" alt="${f.name}">` : `<div style="height:150px;display:flex;align-items:center;justify-content:center;background:#f2f2f2"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>`}<div class="attachment-info"><span class="attachment-name">${escapeHtml(f.name)}</span><button class="download-btn" onclick="downloadFile(${i},'${post.id}')">다운로드</button></div></div>`).join('')}</div></div>` : '';
-    elements.postContent.innerHTML = `<div class="form-document"><div class="doc-header"><table class="info-table"><tr><td class="label-cell">문서번호</td><td class="value-cell">${escapeHtml(post.doc_number || '')}</td></tr></table><h1 class="doc-title">Intake Report (구조 요청 신청서)</h1><table class="info-table"><tr><td class="label-cell">담당/직책</td><td class="value-cell">${escapeHtml(d.position || '')}</td><td class="label-cell">작성일</td><td class="value-cell">${post.created_at ? post.created_at.split('T')[0] : ''}</td></tr></table></div><h2 class="section-title">1. 구조 대상자 개요</h2><table class="data-table"><tr><td rowspan="5" class="section-label"><span class="required">* 인적사항</span></td><td class="label-cell">국가/도시</td><td colspan="3">${escapeHtml(d.country_city || '')}</td></tr><tr><td class="label-cell">이름</td><td>${escapeHtml(d.name || '')}</td><td class="label-cell">불법체류사유</td><td>${escapeHtml(d.illegal_reason || '')}</td></tr><tr><td class="label-cell">연락처</td><td>${escapeHtml(d.contact || '')}</td><td class="label-cell">불법체류기간</td><td>${escapeHtml(d.illegal_period || '')}</td></tr><tr><td class="label-cell">현재주소</td><td colspan="3">${escapeHtml(d.current_address || '')}</td></tr><tr><td class="label-cell">한국 주소</td><td colspan="3">${escapeHtml(d.korea_address || '')}</td></tr></table><table class="data-table"><tr><td rowspan="3" class="section-label"><span class="required">* 추천인</span></td><td class="label-cell">성명</td><td>${escapeHtml(d.recommender_name || '')}</td><td class="label-cell">연락처</td><td>${escapeHtml(d.recommender_contact || '')}</td></tr><tr><td class="label-cell">소속 기관</td><td>${escapeHtml(d.recommender_org || '')}</td><td class="label-cell">이메일</td><td>${escapeHtml(d.recommender_email || '')}</td></tr><tr><td class="label-cell">기관 주소</td><td colspan="3">${escapeHtml(d.recommender_address || '')}</td></tr></table><table class="data-table"><tr><td rowspan="3" class="section-label"><span class="required">* 가족사항</span></td><td class="label-cell header">성명</td><td class="label-cell header">관계</td><td class="label-cell header">나이</td><td class="label-cell header">상세내용</td><td class="label-cell header">연락처</td></tr><tr><td>${escapeHtml(d.family1_name || '')}</td><td>${escapeHtml(d.family1_relation || '')}</td><td>${escapeHtml(d.family1_age || '')}</td><td>${escapeHtml(d.family1_detail || '')}</td><td>${escapeHtml(d.family1_contact || '')}</td></tr><tr><td>${escapeHtml(d.family2_name || '')}</td><td>${escapeHtml(d.family2_relation || '')}</td><td>${escapeHtml(d.family2_age || '')}</td><td>${escapeHtml(d.family2_detail || '')}</td><td>${escapeHtml(d.family2_contact || '')}</td></tr></table><h2 class="section-title">구조 예산안</h2><table class="data-table budget-table"><thead><tr><td class="label-cell header">세부항목</td><td class="label-cell header">산출근거</td><td class="label-cell header">금액</td></tr></thead><tbody><tr><td>${escapeHtml(d.budget1_item || '')}</td><td>${escapeHtml(d.budget1_basis || '')}</td><td>${escapeHtml(d.budget1_amount || '')}</td></tr><tr><td>${escapeHtml(d.budget2_item || '')}</td><td>${escapeHtml(d.budget2_basis || '')}</td><td>${escapeHtml(d.budget2_amount || '')}</td></tr><tr><td colspan="2" class="label-cell">합계</td><td>${escapeHtml(d.budget_total || '')}</td></tr></tbody></table><h2 class="section-title section-divider">2. 세부사항</h2><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 현지 생활 현황</span></span></div><div class="form-textarea" style="min-height:80px;white-space:pre-wrap">${escapeHtml(d.local_life || '')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 건강상태</span></span></div><div class="form-textarea" style="min-height:80px;white-space:pre-wrap">${escapeHtml(d.health_status || '')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 귀국 후 계획</span></span></div><div class="form-textarea" style="min-height:80px;white-space:pre-wrap">${escapeHtml(d.return_plan || '')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 사례 접수 경위</span></span></div><div class="form-textarea" style="min-height:80px;white-space:pre-wrap">${escapeHtml(d.case_history || '')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title">전문가 의견</span></div><div class="form-textarea" style="min-height:80px;white-space:pre-wrap">${escapeHtml(d.expert_opinion || '')}</div></div></div>${att}`;
+    const d = post.data;
+    const famHtml = (d.families || []).map(f => `<tr><td>${escapeHtml(f.name||'')}</td><td>${escapeHtml(f.relation||'')}</td><td>${escapeHtml(f.age||'')}</td><td>${escapeHtml(f.detail||'')}</td><td>${escapeHtml(f.contact||'')}</td></tr>`).join('') || '<tr><td colspan="5">-</td></tr>';
+    const budHtml = (d.budgets || []).map(b => `<tr><td>${escapeHtml(b.item||'')}</td><td>${escapeHtml(b.basis||'')}</td><td>${escapeHtml(b.amount||'')}</td></tr>`).join('') || '<tr><td colspan="3">-</td></tr>';
+    const attHtml = post.attachments?.length ? `<div class="attachments-section"><h3>첨부파일</h3><div class="attachments-grid">${post.attachments.map((f,i) => `<div class="attachment-item">${f.type?.startsWith('image/') ? `<img src="${f.url}" alt="">` : `<div class="file-icon" style="height:140px;display:flex;align-items:center;justify-content:center;background:#f2f2f2"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>`}<div class="attachment-info"><span class="attachment-name">${escapeHtml(f.name)}</span><a href="${f.url}" target="_blank" class="download-btn">다운로드</a></div></div>`).join('')}</div></div>` : '';
+    const dateStr = post.created_at ? new Date(post.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '';
+    elements.postContent.innerHTML = `<div class="form-document" id="print-area"><div class="doc-header"><table class="info-table"><tr><td class="label-cell">문서번호</td><td class="value-cell">${escapeHtml(post.doc_number||'')}</td></tr></table><h1 class="doc-title">Intake Report (구조 요청 신청서)</h1><table class="info-table"><tr><td class="label-cell">담당/직책</td><td class="value-cell">${escapeHtml(d.position||'')}</td><td class="label-cell">작성일</td><td class="value-cell">${dateStr}</td></tr></table></div><h2 class="section-title">1. 구조 대상자 개요</h2><table class="data-table"><tr><td rowspan="5" class="section-label"><span class="required">* 인적사항</span></td><td class="label-cell">국가/도시</td><td colspan="3">${escapeHtml(d.country_city||'')}</td></tr><tr><td class="label-cell">이름</td><td>${escapeHtml(d.name||'')}</td><td class="label-cell">불법체류사유</td><td>${escapeHtml(d.illegal_reason||'')}</td></tr><tr><td class="label-cell">연락처</td><td>${escapeHtml(d.contact||'')}</td><td class="label-cell">불법체류기간</td><td>${escapeHtml(d.illegal_period||'')}</td></tr><tr><td class="label-cell">현재주소</td><td colspan="3">${escapeHtml(d.current_address||'')}</td></tr><tr><td class="label-cell">한국주소</td><td colspan="3">${escapeHtml(d.korea_address||'')}</td></tr></table><table class="data-table"><tr><td rowspan="3" class="section-label"><span class="required">* 추천인</span></td><td class="label-cell">성명</td><td>${escapeHtml(d.recommender_name||'')}</td><td class="label-cell">연락처</td><td>${escapeHtml(d.recommender_contact||'')}</td></tr><tr><td class="label-cell">소속기관</td><td>${escapeHtml(d.recommender_org||'')}</td><td class="label-cell">이메일</td><td>${escapeHtml(d.recommender_email||'')}</td></tr><tr><td class="label-cell">기관주소</td><td colspan="3">${escapeHtml(d.recommender_address||'')}</td></tr></table><table class="data-table"><tr><td class="section-label"><span class="required">* 가족사항</span></td><td class="label-cell">성명</td><td class="label-cell">관계</td><td class="label-cell">나이</td><td class="label-cell">상세내용</td><td class="label-cell">연락처</td></tr>${famHtml}</table><h2 class="section-title">구조 예산안</h2><table class="data-table budget-table"><thead><tr><td class="label-cell">세부항목</td><td class="label-cell">산출근거</td><td class="label-cell">금액</td></tr></thead><tbody>${budHtml}</tbody><tfoot><tr><td colspan="2" class="label-cell">합계</td><td>${escapeHtml(d.budget_total||'')}</td></tr></tfoot></table><h2 class="section-title section-divider">2. 세부사항</h2><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 현지 생활 현황</span></span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.local_life||'')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 건강상태</span></span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.health_status||'')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 귀국 후 계획</span></span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.return_plan||'')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title"><span class="required">* 사례 접수 경위</span></span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.case_history||'')}</div></div><div class="detail-section"><div class="detail-header"><span class="detail-title">전문가 의견</span></div><div class="form-textarea" style="min-height:60px;white-space:pre-wrap;border:1px solid #ddd;padding:8px">${escapeHtml(d.expert_opinion||'')}</div></div></div>${attHtml}`;
 }
 
-function downloadFile(i, postId) { const post = state.posts.find(p => p.id === postId); if (!post?.attachments?.[i]) return; const f = post.attachments[i], a = document.createElement('a'); a.href = f.data; a.download = f.name; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
+function generatePDF() {
+    const el = document.getElementById('print-area');
+    if (!el) return alert('PDF 생성 영역이 없습니다.');
+    const opt = { margin: 10, filename: `구조요청_${Date.now()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+    html2pdf().set(opt).from(el).save();
+}
+
+function downloadCSV() {
+    if (!state.posts.length) return alert('데이터가 없습니다.');
+    const headers = ['문서번호','작성일','국가/도시','이름','연락처','불법체류사유','불법체류기간','현재주소','한국주소'];
+    const rows = state.posts.map(p => {
+        const d = p.data;
+        return [p.doc_number||'', p.created_at||'', d.country_city||'', d.name||'', d.contact||'', d.illegal_reason||'', d.illegal_period||'', d.current_address||'', d.korea_address||''].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+    });
+    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `구조요청_${Date.now()}.csv`; a.click();
+}
+
 function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 function showLoading() { elements.loadingOverlay.classList.remove('hidden'); }
 function hideLoading() { elements.loadingOverlay.classList.add('hidden'); }
+
+window.addFamilyRow = addFamilyRow;
+window.removeFamilyRow = removeFamilyRow;
+window.addBudgetRow = addBudgetRow;
+window.removeBudgetRow = removeBudgetRow;
+window.calcBudgetTotal = calcBudgetTotal;
 window.removeFile = removeFile;
-window.downloadFile = downloadFile;
