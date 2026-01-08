@@ -79,6 +79,24 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.adminBtn.classList.add('logged-in');
         elements.csvBtn.classList.remove('hidden');
     }
+    // 뒤로가기 이벤트
+    window.addEventListener('popstate', (e) => {
+        if (e.state) {
+            if (e.state.page === 'list') {
+                showBoardListNoHistory();
+            } else if (e.state.page === 'write') {
+                showWriteFormNoHistory();
+            } else if (e.state.page === 'view' && e.state.postId) {
+                const post = state.posts.find(p => p.id === e.state.postId);
+                if (post) showViewPostNoHistory(post);
+                else showBoardListNoHistory();
+            }
+        } else {
+            showBoardListNoHistory();
+        }
+    });
+    // 초기 상태 저장
+    history.replaceState({ page: 'list' }, '', window.location.pathname);
 });
 
 async function loadAdminPassword() {
@@ -153,8 +171,10 @@ function renderPosts() {
         let dateHtml = '';
         if (post.created_at) {
             const d = new Date(post.created_at);
-            const datePart = d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit', day: '2-digit' });
-            const timePart = d.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
+            // UTC를 KST로 변환 (+9시간)
+            const kst = new Date(d.getTime() + (9 * 60 * 60 * 1000));
+            const datePart = kst.toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' });
+            const timePart = kst.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
             dateHtml = `${datePart}<br>${timePart}`;
         }
         return `<tr data-id="${post.id}"><td class="col-no" style="text-align:center">${state.posts.length - start - i}</td><td class="col-title"><div class="post-title"><svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>${country} 구조요청</span></div></td><td class="col-author">${escapeHtml(author)}</td><td class="col-date">${dateHtml}</td></tr>`;
@@ -179,6 +199,15 @@ function showBoardList() {
     elements.viewPost.classList.add('hidden');
     loadPosts();
     window.scrollTo(0, 0);
+    history.pushState({ page: 'list' }, '', window.location.pathname);
+}
+
+function showBoardListNoHistory() {
+    elements.boardList.classList.remove('hidden');
+    elements.writeForm.classList.add('hidden');
+    elements.viewPost.classList.add('hidden');
+    loadPosts();
+    window.scrollTo(0, 0);
 }
 
 function showWriteForm() {
@@ -191,9 +220,32 @@ function showWriteForm() {
     resetForm();
     setCurrentDate();
     window.scrollTo(0, 0);
+    history.pushState({ page: 'write' }, '', window.location.pathname + '?write');
+}
+
+function showWriteFormNoHistory() {
+    elements.boardList.classList.add('hidden');
+    elements.writeForm.classList.remove('hidden');
+    elements.viewPost.classList.add('hidden');
+    state.isEditing = false;
+    state.editingPostId = null;
+    elements.writeForm.querySelector('.form-header h2').textContent = '구조 요청 신청서 작성';
+    resetForm();
+    setCurrentDate();
+    window.scrollTo(0, 0);
 }
 
 function showViewPost(post) {
+    elements.boardList.classList.add('hidden');
+    elements.writeForm.classList.add('hidden');
+    elements.viewPost.classList.remove('hidden');
+    state.currentPostId = post.id;
+    renderPostContent(post);
+    window.scrollTo(0, 0);
+    history.pushState({ page: 'view', postId: post.id }, '', window.location.pathname + '?view=' + post.id);
+}
+
+function showViewPostNoHistory(post) {
     elements.boardList.classList.add('hidden');
     elements.writeForm.classList.add('hidden');
     elements.viewPost.classList.remove('hidden');
@@ -304,7 +356,11 @@ function showEditForm(post) {
     elements.writeForm.classList.remove('hidden');
     elements.writeForm.querySelector('.form-header h2').textContent = '구조 요청 신청서 수정';
     elements.docNumber.value = post.doc_number || '';
-    elements.writeDate.textContent = post.created_at ? new Date(post.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }).split(' ')[0] : getKSTDate();
+    elements.writeDate.textContent = post.created_at ? (() => {
+        const d = new Date(post.created_at);
+        const kst = new Date(d.getTime() + (9 * 60 * 60 * 1000));
+        return kst.toLocaleDateString('ko-KR');
+    })() : getKSTDate();
     document.getElementById('password').value = post.password;
     const d = post.data;
     ['position','country_city','name','illegal_reason','contact','illegal_period','current_address','korea_address','recommender_name','recommender_contact','recommender_org','recommender_email','recommender_address','local_life','health_status','return_plan','case_history','expert_opinion'].forEach(n => {
@@ -505,7 +561,11 @@ async function handleSubmit(e) {
 
 function renderPostContent(post) {
     const d = post.data;
-    const dateStr = post.created_at ? new Date(post.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '';
+    const dateStr = post.created_at ? (() => {
+        const d = new Date(post.created_at);
+        const kst = new Date(d.getTime() + (9 * 60 * 60 * 1000));
+        return kst.toLocaleString('ko-KR');
+    })() : '';
     
     // 가족사항 행
     const famRows = (d.families || []).map(f => `
