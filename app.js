@@ -195,8 +195,8 @@ function resetForm() {
     elements.filePreview.innerHTML = '';
     elements.uploadProgress.classList.add('hidden');
     elements.docNumber.value = '';
-    elements.familyRows.innerHTML = '<tr><td class="row-num"></td><td><input type="text" name="family_name[]" class="form-input"></td><td><input type="text" name="family_relation[]" class="form-input"></td><td><input type="text" name="family_age[]" class="form-input"></td><td><input type="text" name="family_detail[]" class="form-input"></td><td><input type="text" name="family_contact[]" class="form-input"></td></tr>';
-    elements.budgetRows.innerHTML = '<tr><td><input type="text" name="budget_item[]" class="form-input"></td><td><input type="text" name="budget_basis[]" class="form-input"></td><td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td></tr>';
+    elements.familyRows.innerHTML = '<tr><td data-label="성명"><input type="text" name="family_name[]" class="form-input"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input"></td><td data-label="상세내용"><input type="text" name="family_detail[]" class="form-input"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input"></td></tr>';
+    elements.budgetRows.innerHTML = '<tr><td data-label="세부항목"><input type="text" name="budget_item[]" class="form-input"></td><td data-label="산출근거"><input type="text" name="budget_basis[]" class="form-input"></td><td data-label="금액"><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td></tr>';
     elements.budgetTotal.value = '';
     elements.submitBtn.disabled = false;
 }
@@ -292,7 +292,7 @@ function showEditForm(post) {
     elements.familyRows.innerHTML = '';
     (families.length ? families : [{}]).forEach(fam => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td class="row-num"></td><td><input type="text" name="family_name[]" class="form-input" value="${escapeHtml(fam.name||'')}"></td><td><input type="text" name="family_relation[]" class="form-input" value="${escapeHtml(fam.relation||'')}"></td><td><input type="text" name="family_age[]" class="form-input" value="${escapeHtml(fam.age||'')}"></td><td><input type="text" name="family_detail[]" class="form-input" value="${escapeHtml(fam.detail||'')}"></td><td><input type="text" name="family_contact[]" class="form-input" value="${escapeHtml(fam.contact||'')}"></td>`;
+        tr.innerHTML = `<td data-label="성명"><input type="text" name="family_name[]" class="form-input" value="${escapeHtml(fam.name||'')}"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input" value="${escapeHtml(fam.relation||'')}"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input" value="${escapeHtml(fam.age||'')}"></td><td data-label="상세내용"><input type="text" name="family_detail[]" class="form-input" value="${escapeHtml(fam.detail||'')}"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input" value="${escapeHtml(fam.contact||'')}"></td>`;
         elements.familyRows.appendChild(tr);
     });
     // 예산 행 복원
@@ -300,7 +300,7 @@ function showEditForm(post) {
     elements.budgetRows.innerHTML = '';
     (budgets.length ? budgets : [{}]).forEach(b => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td><input type="text" name="budget_item[]" class="form-input" value="${escapeHtml(b.item||'')}"></td><td><input type="text" name="budget_basis[]" class="form-input" value="${escapeHtml(b.basis||'')}"></td><td><input type="text" name="budget_amount[]" class="form-input" value="${escapeHtml(b.amount||'')}" oninput="calcBudgetTotal()"></td>`;
+        tr.innerHTML = `<td data-label="세부항목"><input type="text" name="budget_item[]" class="form-input" value="${escapeHtml(b.item||'')}"></td><td data-label="산출근거"><input type="text" name="budget_basis[]" class="form-input" value="${escapeHtml(b.basis||'')}"></td><td data-label="금액"><input type="text" name="budget_amount[]" class="form-input" value="${escapeHtml(b.amount||'')}" oninput="calcBudgetTotal()"></td>`;
         elements.budgetRows.appendChild(tr);
     });
     elements.budgetTotal.value = d.budget_total || '';
@@ -312,7 +312,7 @@ function showEditForm(post) {
 // 동적 행 추가/삭제
 function addFamilyRow() {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td class="row-num"></td><td><input type="text" name="family_name[]" class="form-input"></td><td><input type="text" name="family_relation[]" class="form-input"></td><td><input type="text" name="family_age[]" class="form-input"></td><td><input type="text" name="family_detail[]" class="form-input"></td><td><input type="text" name="family_contact[]" class="form-input"></td>';
+    tr.innerHTML = '<td data-label="성명"><input type="text" name="family_name[]" class="form-input"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input"></td><td data-label="상세내용"><input type="text" name="family_detail[]" class="form-input"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input"></td>';
     elements.familyRows.appendChild(tr);
 }
 function removeLastFamilyRow() {
@@ -326,7 +326,7 @@ function removeFamilyRow(btn) {
 }
 function addBudgetRow() {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td><input type="text" name="budget_item[]" class="form-input"></td><td><input type="text" name="budget_basis[]" class="form-input"></td><td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td>';
+    tr.innerHTML = '<td data-label="세부항목"><input type="text" name="budget_item[]" class="form-input"></td><td data-label="산출근거"><input type="text" name="budget_basis[]" class="form-input"></td><td data-label="금액"><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td>';
     elements.budgetRows.appendChild(tr);
 }
 function removeLastBudgetRow() {

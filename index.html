@@ -131,10 +131,12 @@
 
                     <!-- 가족사항 (동적) -->
                     <div class="dynamic-section">
+                        <div class="section-header-row">
+                            <span class="section-label-inline"><span class="required">* 가족사항</span></span>
+                        </div>
                         <table class="data-table" id="family-table">
                             <thead>
                                 <tr>
-                                    <th class="section-label" rowspan="2"><span>* 가족사항</span></th>
                                     <th class="label-cell">성명</th>
                                     <th class="label-cell">관계</th>
                                     <th class="label-cell">나이</th>
@@ -144,12 +146,11 @@
                             </thead>
                             <tbody id="family-rows">
                                 <tr>
-                                    <td class="row-num"></td>
-                                    <td><input type="text" name="family_name[]" class="form-input"></td>
-                                    <td><input type="text" name="family_relation[]" class="form-input"></td>
-                                    <td><input type="text" name="family_age[]" class="form-input"></td>
-                                    <td><input type="text" name="family_detail[]" class="form-input"></td>
-                                    <td><input type="text" name="family_contact[]" class="form-input"></td>
+                                    <td data-label="성명"><input type="text" name="family_name[]" class="form-input"></td>
+                                    <td data-label="관계"><input type="text" name="family_relation[]" class="form-input"></td>
+                                    <td data-label="나이"><input type="text" name="family_age[]" class="form-input"></td>
+                                    <td data-label="상세내용"><input type="text" name="family_detail[]" class="form-input"></td>
+                                    <td data-label="연락처"><input type="text" name="family_contact[]" class="form-input"></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -172,9 +173,9 @@
                             </thead>
                             <tbody id="budget-rows">
                                 <tr>
-                                    <td><input type="text" name="budget_item[]" class="form-input"></td>
-                                    <td><input type="text" name="budget_basis[]" class="form-input"></td>
-                                    <td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td>
+                                    <td data-label="세부항목"><input type="text" name="budget_item[]" class="form-input"></td>
+                                    <td data-label="산출근거"><input type="text" name="budget_basis[]" class="form-input"></td>
+                                    <td data-label="금액"><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td>
                                 </tr>
                             </tbody>
                             <tfoot>
