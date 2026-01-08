@@ -256,15 +256,23 @@ function showDeleteModal() { elements.deleteModal.classList.remove('hidden'); do
 function hideDeleteModal() { elements.deleteModal.classList.add('hidden'); }
 async function handleDeleteConfirm() {
     const pw = document.getElementById('delete-password').value;
-    const post = state.posts.find(p => p.id === state.currentPostId);
-    if (!post) { hideDeleteModal(); return; }
-    if (pw === post.password || pw === state.adminPassword) {
-        showLoading();
-        await supabase.fetch(`posts?id=eq.${state.currentPostId}`, { method: 'DELETE' });
+    if (!pw) { alert('비밀번호를 입력하세요.'); return; }
+    showLoading();
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_post`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ post_id: state.currentPostId, input_password: pw, admin_pw: state.adminPassword })
+        });
+        const result = await res.json();
         hideDeleteModal(); hideLoading();
-        alert('삭제되었습니다.');
-        showBoardList();
-    } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('delete-password').value = ''; }
+        if (result === true) {
+            alert('삭제되었습니다.');
+            showBoardList();
+        } else {
+            alert('비밀번호가 일치하지 않습니다.');
+        }
+    } catch (err) { hideLoading(); alert('오류 발생'); console.error(err); }
 }
 
 function showEditModal() { elements.editModal.classList.remove('hidden'); document.getElementById('edit-password').value = ''; document.getElementById('edit-password').focus(); }
@@ -456,14 +464,33 @@ async function handleSubmit(e) {
     };
     try {
         if (state.isEditing && state.editingPostId) {
-            await supabase.fetch(`posts?id=eq.${state.editingPostId}`, { method: 'PATCH', body: JSON.stringify({ country, password: pw, doc_number: elements.docNumber.value, data, attachments: state.selectedFiles }) });
-            state.isEditing = false; state.editingPostId = null;
-            alert('수정되었습니다.');
+            const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_post`, {
+                method: 'POST',
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    post_id: state.editingPostId, 
+                    input_password: pw, 
+                    admin_pw: state.adminPassword,
+                    new_country: country,
+                    new_doc_number: elements.docNumber.value,
+                    new_data: data,
+                    new_attachments: state.selectedFiles
+                })
+            });
+            const result = await res.json();
+            if (result === true) {
+                state.isEditing = false; state.editingPostId = null;
+                alert('수정되었습니다.');
+                hideLoading(); showBoardList();
+            } else {
+                hideLoading();
+                alert('비밀번호가 일치하지 않습니다.');
+            }
         } else {
             await supabase.fetch('posts', { method: 'POST', body: JSON.stringify({ country, password: pw, doc_number: elements.docNumber.value, data, attachments: state.selectedFiles }) });
             alert('제출되었습니다.');
+            hideLoading(); showBoardList();
         }
-        hideLoading(); showBoardList();
     } catch (err) { hideLoading(); alert('오류 발생'); console.error(err); }
 }
 
