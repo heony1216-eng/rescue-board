@@ -143,8 +143,14 @@ function renderPosts() {
     elements.postList.innerHTML = state.posts.slice(start, end).map((post, i) => {
         const country = post.country ? `[${post.country}]` : '';
         const author = state.isAdmin ? (post.data?.name || '익명') : '익명';
-        const date = post.created_at ? new Date(post.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-        return `<tr data-id="${post.id}"><td class="col-no" style="text-align:center">${state.posts.length - start - i}</td><td class="col-title"><div class="post-title"><svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>${country} 구조요청</span></div></td><td class="col-author">${escapeHtml(author)}</td><td class="col-date">${date}</td></tr>`;
+        let dateHtml = '';
+        if (post.created_at) {
+            const d = new Date(post.created_at);
+            const datePart = d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit', day: '2-digit' });
+            const timePart = d.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
+            dateHtml = `${datePart}<br>${timePart}`;
+        }
+        return `<tr data-id="${post.id}"><td class="col-no" style="text-align:center">${state.posts.length - start - i}</td><td class="col-title"><div class="post-title"><svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>${country} 구조요청</span></div></td><td class="col-author">${escapeHtml(author)}</td><td class="col-date">${dateHtml}</td></tr>`;
     }).join('');
     elements.postList.querySelectorAll('tr').forEach(row => row.addEventListener('click', () => handlePostClick(row.dataset.id)));
     renderPagination();
