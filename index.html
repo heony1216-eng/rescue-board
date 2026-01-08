@@ -80,54 +80,58 @@
                     <p class="required-notice">* 부분은 꼭 작성 부탁드립니다.</p>
 
                     <!-- 인적사항 -->
-                    <table class="data-table">
-                        <tr>
-                            <td rowspan="5" class="section-label"><span class="required">* 인적사항</span></td>
-                            <td class="label-cell">국가/도시</td>
-                            <td colspan="3"><input type="text" name="country_city" class="form-input" required></td>
-                        </tr>
-                        <tr>
-                            <td class="label-cell">이름</td>
-                            <td><input type="text" name="name" class="form-input" required></td>
-                            <td class="label-cell">불법체류사유</td>
-                            <td><input type="text" name="illegal_reason" class="form-input"></td>
-                        </tr>
-                        <tr>
-                            <td class="label-cell">연락처</td>
-                            <td><input type="text" name="contact" class="form-input" required></td>
-                            <td class="label-cell">불법체류기간</td>
-                            <td><input type="text" name="illegal_period" class="form-input"></td>
-                        </tr>
-                        <tr>
-                            <td class="label-cell">현재주소</td>
-                            <td colspan="3"><input type="text" name="current_address" class="form-input"></td>
-                        </tr>
-                        <tr>
-                            <td class="label-cell">한국 주소</td>
-                            <td colspan="3"><input type="text" name="korea_address" class="form-input"></td>
-                        </tr>
-                    </table>
+                    <div class="table-section">
+                        <div class="section-label-header"><span class="required">* 인적사항</span></div>
+                        <table class="data-table no-header">
+                            <tr>
+                                <td class="label-cell">국가/도시</td>
+                                <td colspan="3"><input type="text" name="country_city" class="form-input" required></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">이름</td>
+                                <td><input type="text" name="name" class="form-input" required></td>
+                                <td class="label-cell">불법체류사유</td>
+                                <td><input type="text" name="illegal_reason" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">연락처</td>
+                                <td><input type="text" name="contact" class="form-input" required></td>
+                                <td class="label-cell">불법체류기간</td>
+                                <td><input type="text" name="illegal_period" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">현재주소</td>
+                                <td colspan="3"><input type="text" name="current_address" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">한국 주소</td>
+                                <td colspan="3"><input type="text" name="korea_address" class="form-input"></td>
+                            </tr>
+                        </table>
+                    </div>
 
                     <!-- 추천인 -->
-                    <table class="data-table">
-                        <tr>
-                            <td rowspan="3" class="section-label"><span class="required">* 추천인</span></td>
-                            <td class="label-cell">성명</td>
-                            <td><input type="text" name="recommender_name" class="form-input"></td>
-                            <td class="label-cell">연락처</td>
-                            <td><input type="text" name="recommender_contact" class="form-input"></td>
-                        </tr>
-                        <tr>
-                            <td class="label-cell">소속 기관</td>
-                            <td><input type="text" name="recommender_org" class="form-input"></td>
-                            <td class="label-cell">이메일</td>
-                            <td><input type="email" name="recommender_email" class="form-input"></td>
-                        </tr>
-                        <tr>
-                            <td class="label-cell">기관 주소</td>
-                            <td colspan="3"><input type="text" name="recommender_address" class="form-input"></td>
-                        </tr>
-                    </table>
+                    <div class="table-section">
+                        <div class="section-label-header"><span class="required">* 추천인</span></div>
+                        <table class="data-table no-header">
+                            <tr>
+                                <td class="label-cell">성명</td>
+                                <td><input type="text" name="recommender_name" class="form-input"></td>
+                                <td class="label-cell">연락처</td>
+                                <td><input type="text" name="recommender_contact" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">소속 기관</td>
+                                <td><input type="text" name="recommender_org" class="form-input"></td>
+                                <td class="label-cell">이메일</td>
+                                <td><input type="email" name="recommender_email" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">기관 주소</td>
+                                <td colspan="3"><input type="text" name="recommender_address" class="form-input"></td>
+                            </tr>
+                        </table>
+                    </div>
 
                     <!-- 가족사항 (동적) -->
                     <div class="dynamic-section">

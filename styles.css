@@ -134,6 +134,8 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
 
 .mobile-only { display: none; }
 .budget-table-header { display: none; }
+.section-label-header { display: none; }
+.table-section { margin-bottom: 12px; }
 
 /* 반응형 */
 @media (max-width: 768px) {
@@ -149,17 +151,19 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
     .doc-title { font-size: 15px; }
     
     /* 모든 테이블 공통 스타일 */
-    .data-table { display: block; width: 100%; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; overflow: hidden; margin-bottom: 15px; }
+    .table-section { margin-bottom: 15px; }
+    .section-label-header { display: block; width: 100%; background: var(--primary-color); color: #fff; padding: 12px 15px; border-radius: 8px 8px 0 0; font-weight: 700; }
+    .section-label-header .required { color: #fff; }
+    
+    .data-table { display: block; width: 100%; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
+    .data-table.no-header { border-radius: 0 0 8px 8px; border-top: none; margin-bottom: 0; }
     .data-table thead { display: none; }
     .data-table tbody { display: block; width: 100%; padding: 15px; background: #fff; }
     .data-table tr { display: block; border: none; padding: 0; margin: 0; background: none; }
     .data-table tr + tr { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
     .data-table td { display: block; width: 100% !important; border: none; padding: 0; margin-bottom: 12px; text-align: left !important; }
     .data-table td:last-child { margin-bottom: 0; }
-    
-    /* 섹션 라벨을 테이블 밖 헤더처럼 보이게 */
-    .data-table .section-label { display: block; width: calc(100% + 32px); background: var(--primary-color); color: #fff; padding: 12px 15px; margin: -15px -16px 15px -16px; text-align: left; font-weight: 700; }
-    .data-table .section-label .required { color: #fff; }
+    .data-table .section-label { display: none; }
     
     /* 필드 라벨 */
     .data-table .label-cell { display: block; background: none; font-weight: 600; color: #333; font-size: 12px; padding: 0 0 4px 0; margin-bottom: 4px; }
