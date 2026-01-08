@@ -136,6 +136,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
 .budget-table-header { display: none; }
 .section-label-header { display: none; }
 .table-section { margin-bottom: 12px; }
+.table-section-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--primary-color); }
 .section-label-inline { display: none; }
 
 .family-table .detail-row { background: #f9f9f9; padding: 10px; }
@@ -160,6 +161,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
     
     /* 모든 테이블 공통 스타일 */
     .table-section { margin-bottom: 15px; }
+    .table-section-title { display: none; }
     .section-label-header { display: block; width: 100%; background: var(--primary-color); color: #fff; padding: 12px 15px; border-radius: 8px 8px 0 0; font-weight: 700; }
     .section-label-header .required { color: #fff; }
     
