@@ -76,7 +76,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
 .label-cell.header { font-weight: 600; }
 .section-label { background: var(--primary-color); color: var(--white); text-align: center; font-weight: 700; width: 80px; }
 .section-label .required { color: var(--white); }
-.form-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; }
+.form-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 16px; }
 .form-textarea { width: 100%; min-height: 80px; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; resize: vertical; }
 
 .dynamic-section { margin-bottom: 16px; }
