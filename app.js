@@ -72,6 +72,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setCurrentDate();
     startKSTClock();
+    // 관리자 상태 복원
+    if (localStorage.getItem('isAdmin') === 'true') {
+        state.isAdmin = true;
+        elements.adminBtn.textContent = '관리자 로그아웃';
+        elements.adminBtn.classList.add('logged-in');
+        elements.csvBtn.classList.remove('hidden');
+    }
 });
 
 async function loadAdminPassword() {
@@ -227,6 +234,7 @@ function handlePasswordSubmit() {
 function showAdminModal() {
     if (state.isAdmin) {
         state.isAdmin = false;
+        localStorage.removeItem('isAdmin');
         elements.adminBtn.textContent = '관리자 로그인';
         elements.adminBtn.classList.remove('logged-in');
         elements.csvBtn.classList.add('hidden');
@@ -243,6 +251,7 @@ function handleAdminLogin() {
     const pw = document.getElementById('admin-password').value;
     if (pw === state.adminPassword) {
         state.isAdmin = true;
+        localStorage.setItem('isAdmin', 'true');
         elements.adminBtn.textContent = '관리자 로그아웃';
         elements.adminBtn.classList.add('logged-in');
         elements.csvBtn.classList.remove('hidden');
