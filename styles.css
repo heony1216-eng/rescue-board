@@ -144,21 +144,27 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
     .form-section { padding: 12px; }
     .form-document { padding: 12px; }
     .doc-title { font-size: 15px; }
+    
+    /* 인적사항, 추천인 등 기본 테이블 */
     .data-table { display: block; width: 100%; }
     .data-table thead { display: none; }
     .data-table tbody { display: block; width: 100%; }
-    .data-table tr { display: block; margin-bottom: 12px; border: 1px solid #999; padding: 10px; background: #fff; }
-    .data-table td { display: block; width: 100% !important; border: none; padding: 6px 0; text-align: left !important; }
-    .data-table td:before { content: attr(data-label); font-weight: 600; display: block; margin-bottom: 4px; color: #666; font-size: 12px; }
-    .data-table .section-label { display: none; }
-    .data-table .row-num { display: none; }
-    .data-table .label-cell { display: none; }
+    .data-table tr { display: block; margin-bottom: 12px; border: 1px solid #999; padding: 10px; background: #fff; border-radius: 8px; }
+    .data-table td { display: block; width: 100% !important; border: none; padding: 4px 0; text-align: left !important; }
+    .data-table .section-label { display: block; background: var(--primary-color); color: #fff; padding: 8px; margin: -10px -10px 10px -10px; border-radius: 6px 6px 0 0; text-align: center; font-weight: 700; }
+    .data-table .label-cell { display: block; background: none; font-weight: 600; color: #333; font-size: 12px; padding: 8px 0 2px 0; }
     .data-table .form-input { width: 100%; }
-    #family-table tbody tr, #budget-table tbody tr { border: 1px solid var(--primary-color); border-radius: 8px; margin-bottom: 10px; }
+    
+    /* 가족사항, 예산안 동적 테이블 */
+    #family-table tr, #budget-table tbody tr { border: 2px solid var(--primary-color); }
+    #family-table td:before, #budget-table tbody td:before { content: attr(data-label); font-weight: 600; display: block; margin-bottom: 4px; color: var(--primary-color); font-size: 12px; }
+    
     .budget-table tfoot { display: block; }
-    .budget-table tfoot tr { display: flex; justify-content: space-between; align-items: center; padding: 10px; }
+    .budget-table tfoot tr { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #999; }
     .budget-table tfoot td { display: inline-block; width: auto !important; padding: 0; }
     .budget-table tfoot td:first-child { font-weight: 600; }
+    .budget-table tfoot td:before { display: none; }
+    
     .row-actions { justify-content: flex-end; }
     .section-header-row { flex-wrap: wrap; }
     .post-actions { justify-content: center; }
