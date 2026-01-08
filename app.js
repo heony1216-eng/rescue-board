@@ -242,6 +242,9 @@ function showViewPost(post) {
     elements.viewPost.classList.remove('hidden');
     state.currentPostId = post.id;
     renderPostContent(post);
+    // 관리자일 때만 PDF/워드 버튼 보이기
+    document.getElementById('pdf-post-btn')?.classList.toggle('hidden', !state.isAdmin);
+    document.getElementById('word-post-btn')?.classList.toggle('hidden', !state.isAdmin);
     window.scrollTo(0, 0);
     history.pushState({ page: 'view', postId: post.id }, '', window.location.pathname + '?view=' + post.id);
 }
@@ -252,6 +255,9 @@ function showViewPostNoHistory(post) {
     elements.viewPost.classList.remove('hidden');
     state.currentPostId = post.id;
     renderPostContent(post);
+    // 관리자일 때만 PDF/워드 버튼 보이기
+    document.getElementById('pdf-post-btn')?.classList.toggle('hidden', !state.isAdmin);
+    document.getElementById('word-post-btn')?.classList.toggle('hidden', !state.isAdmin);
     window.scrollTo(0, 0);
 }
 
