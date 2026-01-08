@@ -14,7 +14,7 @@
     <div class="container">
         <header class="header">
             <h1>한인구조단 구조 요청</h1>
-            <div id="kst-clock" class="kst-clock hidden"></div>
+            <div id="kst-clock" class="kst-clock"></div>
         </header>
 
         <!-- 게시판 목록 -->
@@ -131,48 +131,43 @@
 
                     <!-- 가족사항 (동적) -->
                     <div class="dynamic-section">
-                        <div class="section-header-row">
-                            <span class="section-label-inline"><span class="required">* 가족사항</span></span>
-                            <button type="button" class="btn-add" onclick="addFamilyRow()">+ 추가</button>
-                        </div>
                         <table class="data-table" id="family-table">
                             <thead>
                                 <tr>
+                                    <th class="section-label" rowspan="2"><span>* 가족사항</span></th>
                                     <th class="label-cell">성명</th>
                                     <th class="label-cell">관계</th>
                                     <th class="label-cell">나이</th>
                                     <th class="label-cell">상세내용</th>
                                     <th class="label-cell">연락처</th>
-                                    <th class="col-action"></th>
                                 </tr>
                             </thead>
                             <tbody id="family-rows">
                                 <tr>
+                                    <td class="row-num"></td>
                                     <td><input type="text" name="family_name[]" class="form-input"></td>
                                     <td><input type="text" name="family_relation[]" class="form-input"></td>
                                     <td><input type="text" name="family_age[]" class="form-input"></td>
                                     <td><input type="text" name="family_detail[]" class="form-input"></td>
                                     <td><input type="text" name="family_contact[]" class="form-input"></td>
-                                    <td><button type="button" class="btn-remove" onclick="removeFamilyRow(this)">-</button></td>
                                 </tr>
                             </tbody>
                         </table>
+                        <div class="row-actions">
+                            <button type="button" class="btn-add" onclick="addFamilyRow()">+</button>
+                            <button type="button" class="btn-remove" onclick="removeLastFamilyRow()">-</button>
+                        </div>
                     </div>
 
                     <!-- 구조 예산안 (동적) -->
                     <h2 class="section-title">구조 예산안</h2>
                     <div class="dynamic-section">
-                        <div class="section-header-row">
-                            <span></span>
-                            <button type="button" class="btn-add" onclick="addBudgetRow()">+ 추가</button>
-                        </div>
                         <table class="data-table budget-table" id="budget-table">
                             <thead>
                                 <tr>
                                     <th class="label-cell">세부항목</th>
                                     <th class="label-cell">산출근거</th>
                                     <th class="label-cell">금액</th>
-                                    <th class="col-action"></th>
                                 </tr>
                             </thead>
                             <tbody id="budget-rows">
@@ -180,17 +175,19 @@
                                     <td><input type="text" name="budget_item[]" class="form-input"></td>
                                     <td><input type="text" name="budget_basis[]" class="form-input"></td>
                                     <td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td>
-                                    <td><button type="button" class="btn-remove" onclick="removeBudgetRow(this)">-</button></td>
                                 </tr>
                             </tbody>
                             <tfoot>
                                 <tr>
                                     <td colspan="2" class="label-cell">합계</td>
                                     <td><input type="text" id="budget-total" name="budget_total" class="form-input" readonly></td>
-                                    <td></td>
                                 </tr>
                             </tfoot>
                         </table>
+                        <div class="row-actions">
+                            <button type="button" class="btn-add" onclick="addBudgetRow()">+</button>
+                            <button type="button" class="btn-remove" onclick="removeLastBudgetRow()">-</button>
+                        </div>
                     </div>
 
                     <h2 class="section-title section-divider">2. 세부사항</h2>
@@ -217,7 +214,7 @@
                     </div>
 
                     <!-- 파일 업로드 -->
-                    <h2 class="section-title">첨부파일</h2>
+                    <h2 class="section-title">첨부파일 <span style="font-weight:400;font-size:13px;color:#666;">- 여권, 신분증 사진 (있으신 분들은 첨부파일로 꼭 올려주세요)</span></h2>
                     <div class="file-upload-area compact">
                         <div class="upload-zone" id="upload-zone">
                             <input type="file" id="file-input" multiple accept="image/*,.pdf,.doc,.docx">

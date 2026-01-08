@@ -85,7 +85,7 @@ async function loadAdminPassword() {
 function startKSTClock() {
     const update = () => {
         const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-        elements.kstClock.textContent = `KST ${now}`;
+        elements.kstClock.textContent = now;
     };
     update();
     setInterval(update, 1000);
@@ -195,8 +195,8 @@ function resetForm() {
     elements.filePreview.innerHTML = '';
     elements.uploadProgress.classList.add('hidden');
     elements.docNumber.value = '';
-    elements.familyRows.innerHTML = '<tr><td><input type="text" name="family_name[]" class="form-input"></td><td><input type="text" name="family_relation[]" class="form-input"></td><td><input type="text" name="family_age[]" class="form-input"></td><td><input type="text" name="family_detail[]" class="form-input"></td><td><input type="text" name="family_contact[]" class="form-input"></td><td><button type="button" class="btn-remove" onclick="removeFamilyRow(this)">-</button></td></tr>';
-    elements.budgetRows.innerHTML = '<tr><td><input type="text" name="budget_item[]" class="form-input"></td><td><input type="text" name="budget_basis[]" class="form-input"></td><td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td><td><button type="button" class="btn-remove" onclick="removeBudgetRow(this)">-</button></td></tr>';
+    elements.familyRows.innerHTML = '<tr><td class="row-num"></td><td><input type="text" name="family_name[]" class="form-input"></td><td><input type="text" name="family_relation[]" class="form-input"></td><td><input type="text" name="family_age[]" class="form-input"></td><td><input type="text" name="family_detail[]" class="form-input"></td><td><input type="text" name="family_contact[]" class="form-input"></td></tr>';
+    elements.budgetRows.innerHTML = '<tr><td><input type="text" name="budget_item[]" class="form-input"></td><td><input type="text" name="budget_basis[]" class="form-input"></td><td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td></tr>';
     elements.budgetTotal.value = '';
     elements.submitBtn.disabled = false;
 }
@@ -224,7 +224,6 @@ function showAdminModal() {
         elements.adminBtn.textContent = '관리자 로그인';
         elements.adminBtn.classList.remove('logged-in');
         elements.csvBtn.classList.add('hidden');
-        elements.kstClock.classList.add('hidden');
         renderPosts();
         alert('로그아웃 되었습니다.');
         return;
@@ -241,7 +240,6 @@ function handleAdminLogin() {
         elements.adminBtn.textContent = '관리자 로그아웃';
         elements.adminBtn.classList.add('logged-in');
         elements.csvBtn.classList.remove('hidden');
-        elements.kstClock.classList.remove('hidden');
         hideAdminModal();
         renderPosts();
         alert('관리자로 로그인되었습니다.');
@@ -294,7 +292,7 @@ function showEditForm(post) {
     elements.familyRows.innerHTML = '';
     (families.length ? families : [{}]).forEach(fam => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td><input type="text" name="family_name[]" class="form-input" value="${escapeHtml(fam.name||'')}"></td><td><input type="text" name="family_relation[]" class="form-input" value="${escapeHtml(fam.relation||'')}"></td><td><input type="text" name="family_age[]" class="form-input" value="${escapeHtml(fam.age||'')}"></td><td><input type="text" name="family_detail[]" class="form-input" value="${escapeHtml(fam.detail||'')}"></td><td><input type="text" name="family_contact[]" class="form-input" value="${escapeHtml(fam.contact||'')}"></td><td><button type="button" class="btn-remove" onclick="removeFamilyRow(this)">-</button></td>`;
+        tr.innerHTML = `<td class="row-num"></td><td><input type="text" name="family_name[]" class="form-input" value="${escapeHtml(fam.name||'')}"></td><td><input type="text" name="family_relation[]" class="form-input" value="${escapeHtml(fam.relation||'')}"></td><td><input type="text" name="family_age[]" class="form-input" value="${escapeHtml(fam.age||'')}"></td><td><input type="text" name="family_detail[]" class="form-input" value="${escapeHtml(fam.detail||'')}"></td><td><input type="text" name="family_contact[]" class="form-input" value="${escapeHtml(fam.contact||'')}"></td>`;
         elements.familyRows.appendChild(tr);
     });
     // 예산 행 복원
@@ -302,7 +300,7 @@ function showEditForm(post) {
     elements.budgetRows.innerHTML = '';
     (budgets.length ? budgets : [{}]).forEach(b => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td><input type="text" name="budget_item[]" class="form-input" value="${escapeHtml(b.item||'')}"></td><td><input type="text" name="budget_basis[]" class="form-input" value="${escapeHtml(b.basis||'')}"></td><td><input type="text" name="budget_amount[]" class="form-input" value="${escapeHtml(b.amount||'')}" oninput="calcBudgetTotal()"></td><td><button type="button" class="btn-remove" onclick="removeBudgetRow(this)">-</button></td>`;
+        tr.innerHTML = `<td><input type="text" name="budget_item[]" class="form-input" value="${escapeHtml(b.item||'')}"></td><td><input type="text" name="budget_basis[]" class="form-input" value="${escapeHtml(b.basis||'')}"></td><td><input type="text" name="budget_amount[]" class="form-input" value="${escapeHtml(b.amount||'')}" oninput="calcBudgetTotal()"></td>`;
         elements.budgetRows.appendChild(tr);
     });
     elements.budgetTotal.value = d.budget_total || '';
@@ -314,8 +312,13 @@ function showEditForm(post) {
 // 동적 행 추가/삭제
 function addFamilyRow() {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td><input type="text" name="family_name[]" class="form-input"></td><td><input type="text" name="family_relation[]" class="form-input"></td><td><input type="text" name="family_age[]" class="form-input"></td><td><input type="text" name="family_detail[]" class="form-input"></td><td><input type="text" name="family_contact[]" class="form-input"></td><td><button type="button" class="btn-remove" onclick="removeFamilyRow(this)">-</button></td>';
+    tr.innerHTML = '<td class="row-num"></td><td><input type="text" name="family_name[]" class="form-input"></td><td><input type="text" name="family_relation[]" class="form-input"></td><td><input type="text" name="family_age[]" class="form-input"></td><td><input type="text" name="family_detail[]" class="form-input"></td><td><input type="text" name="family_contact[]" class="form-input"></td>';
     elements.familyRows.appendChild(tr);
+}
+function removeLastFamilyRow() {
+    const rows = elements.familyRows.querySelectorAll('tr');
+    if (rows.length > 1) rows[rows.length - 1].remove();
+    else alert('최소 1개의 행이 필요합니다.');
 }
 function removeFamilyRow(btn) {
     if (elements.familyRows.querySelectorAll('tr').length > 1) btn.closest('tr').remove();
@@ -323,8 +326,13 @@ function removeFamilyRow(btn) {
 }
 function addBudgetRow() {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td><input type="text" name="budget_item[]" class="form-input"></td><td><input type="text" name="budget_basis[]" class="form-input"></td><td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td><td><button type="button" class="btn-remove" onclick="removeBudgetRow(this)">-</button></td>';
+    tr.innerHTML = '<td><input type="text" name="budget_item[]" class="form-input"></td><td><input type="text" name="budget_basis[]" class="form-input"></td><td><input type="text" name="budget_amount[]" class="form-input" oninput="calcBudgetTotal()"></td>';
     elements.budgetRows.appendChild(tr);
+}
+function removeLastBudgetRow() {
+    const rows = elements.budgetRows.querySelectorAll('tr');
+    if (rows.length > 1) { rows[rows.length - 1].remove(); calcBudgetTotal(); }
+    else alert('최소 1개의 행이 필요합니다.');
 }
 function removeBudgetRow(btn) {
     if (elements.budgetRows.querySelectorAll('tr').length > 1) { btn.closest('tr').remove(); calcBudgetTotal(); }
@@ -481,8 +489,10 @@ function showLoading() { elements.loadingOverlay.classList.remove('hidden'); }
 function hideLoading() { elements.loadingOverlay.classList.add('hidden'); }
 
 window.addFamilyRow = addFamilyRow;
+window.removeLastFamilyRow = removeLastFamilyRow;
 window.removeFamilyRow = removeFamilyRow;
 window.addBudgetRow = addBudgetRow;
+window.removeLastBudgetRow = removeLastBudgetRow;
 window.removeBudgetRow = removeBudgetRow;
 window.calcBudgetTotal = calcBudgetTotal;
 window.removeFile = removeFile;

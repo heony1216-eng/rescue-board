@@ -17,9 +17,9 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
 .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
 .hidden { display: none !important; }
 
-.header { background: var(--primary-color); color: var(--white); padding: 24px; border-radius: var(--radius); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+.header { background: var(--primary-color); color: var(--white); padding: 24px; border-radius: var(--radius); margin-bottom: 20px; position: relative; text-align: center; }
 .header h1 { font-size: 22px; font-weight: 700; }
-.kst-clock { font-size: 14px; background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: var(--radius-sm); }
+.kst-clock { font-size: 12px; position: absolute; bottom: 8px; right: 12px; opacity: 0.9; }
 
 .board-section { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
 .board-header { display: flex; justify-content: flex-end; margin-bottom: 16px; gap: 10px; }
@@ -74,16 +74,18 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
 .label-cell { background: var(--bg-gray); text-align: center; width: 15%; font-weight: 400; }
 .label-cell.header { font-weight: 600; }
 .section-label { background: var(--primary-color); color: var(--white); text-align: center; font-weight: 700; width: 80px; }
+.section-label .required { color: var(--white); }
 .form-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; }
 .form-textarea { width: 100%; min-height: 80px; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; resize: vertical; }
 
 .dynamic-section { margin-bottom: 16px; }
 .section-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .section-label-inline { font-weight: 700; color: var(--primary-color); }
-.btn-add, .btn-remove { width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer; font-size: 16px; font-weight: 700; }
-.btn-add { background: var(--primary-color); color: var(--white); }
+.btn-add, .btn-remove { width: 24px; height: 24px; border-radius: 4px; border: none; cursor: pointer; font-size: 18px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.btn-add { background: #28a745; color: var(--white); }
 .btn-remove { background: #dc3545; color: var(--white); }
-.col-action { width: 40px; text-align: center; }
+.col-action { width: 30px; text-align: center; }
+.row-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 8px; }
 
 .detail-section { margin-bottom: 16px; }
 .detail-header { margin-bottom: 6px; }
