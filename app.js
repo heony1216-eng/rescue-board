@@ -144,6 +144,7 @@ function setupEventListeners() {
     elements.deletePostBtn?.addEventListener('click', (e) => { e.preventDefault(); showDeleteModal(); });
     elements.printPostBtn?.addEventListener('click', (e) => { e.preventDefault(); window.print(); });
     elements.pdfPostBtn?.addEventListener('click', (e) => { e.preventDefault(); generatePDF(); });
+    document.getElementById('word-post-btn')?.addEventListener('click', (e) => { e.preventDefault(); generateWord(); });
     elements.uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); elements.uploadZone.classList.add('dragover'); });
     elements.uploadZone.addEventListener('dragleave', (e) => { e.preventDefault(); elements.uploadZone.classList.remove('dragover'); });
     elements.uploadZone.addEventListener('drop', (e) => { e.preventDefault(); elements.uploadZone.classList.remove('dragover'); processFiles(Array.from(e.dataTransfer.files)); });
@@ -760,6 +761,43 @@ function generatePDF() {
     if (!el) return alert('PDF 생성 영역이 없습니다.');
     const opt = { margin: 10, filename: `구조요청_${Date.now()}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
     html2pdf().set(opt).from(el).save();
+}
+
+function generateWord() {
+    const el = document.getElementById('print-area');
+    if (!el) return alert('워드 생성 영역이 없습니다.');
+    
+    const styles = `
+        <style>
+            body { font-family: '맑은 고딕', sans-serif; font-size: 11pt; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
+            td, th { border: 1px solid #333; padding: 6px 8px; }
+            .section-label, .section-label-header { background-color: #dc3545; color: white; font-weight: bold; }
+            .label-cell { background-color: #f2f2f2; text-align: center; }
+            .doc-title { text-align: center; font-size: 16pt; font-weight: bold; margin: 15px 0; }
+            .section-title { font-size: 12pt; font-weight: bold; margin: 15px 0 10px; }
+            .view-textarea { border: 1px solid #ddd; padding: 8px; min-height: 40px; }
+        </style>
+    `;
+    
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            ${styles}
+        </head>
+        <body>
+            ${el.innerHTML}
+        </body>
+        </html>
+    `;
+    
+    const converted = htmlDocx.asBlob(html);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(converted);
+    link.download = `구조요청_${Date.now()}.docx`;
+    link.click();
 }
 
 function downloadCSV() {

@@ -51,6 +51,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-light); col
 .btn-edit { background: #ffc107; color: #333; }
 .btn-print { background: #17a2b8; color: var(--white); }
 .btn-pdf { background: #6c757d; color: var(--white); }
+.btn-word { background: #2b579a; color: var(--white); }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .form-section { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
