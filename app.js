@@ -318,15 +318,37 @@ function showAdminModal() {
         return;
     }
     elements.adminModal.classList.remove('hidden');
-    document.getElementById('admin-password').value = '';
+
+    // 저장된 비밀번호 불러오기
+    const savedPassword = localStorage.getItem('savedAdminPassword');
+    const rememberCheckbox = document.getElementById('remember-admin-password');
+
+    if (savedPassword) {
+        document.getElementById('admin-password').value = savedPassword;
+        rememberCheckbox.checked = true;
+    } else {
+        document.getElementById('admin-password').value = '';
+        rememberCheckbox.checked = false;
+    }
+
     document.getElementById('admin-password').focus();
 }
 function hideAdminModal() { elements.adminModal.classList.add('hidden'); }
 function handleAdminLogin() {
     const pw = document.getElementById('admin-password').value;
+    const rememberCheckbox = document.getElementById('remember-admin-password');
+
     if (pw === state.adminPassword) {
         state.isAdmin = true;
         localStorage.setItem('isAdmin', 'true');
+
+        // 비밀번호 저장 체크박스 확인
+        if (rememberCheckbox.checked) {
+            localStorage.setItem('savedAdminPassword', pw);
+        } else {
+            localStorage.removeItem('savedAdminPassword');
+        }
+
         elements.adminBtn.textContent = '관리자 로그아웃';
         elements.adminBtn.classList.add('logged-in');
         elements.csvBtn.classList.remove('hidden');
