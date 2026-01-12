@@ -48,6 +48,7 @@ function initElements() {
         loadingOverlay: document.getElementById('loading-overlay'),
         uploadZone: document.getElementById('upload-zone'),
         fileInput: document.getElementById('file-input'),
+        themeToggle: document.getElementById('theme-toggle'),
         filePreview: document.getElementById('file-preview'),
         uploadProgress: document.getElementById('upload-progress'),
         progressFill: document.getElementById('progress-fill'),
@@ -72,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setCurrentDate();
     startKSTClock();
+    initTheme();
     // 관리자 상태 복원
     if (localStorage.getItem('isAdmin') === 'true') {
         state.isAdmin = true;
@@ -132,6 +134,7 @@ function setupEventListeners() {
     elements.rescueForm.addEventListener('submit', handleSubmit);
     elements.adminBtn.addEventListener('click', showAdminModal);
     elements.csvBtn?.addEventListener('click', downloadCSV);
+    elements.themeToggle?.addEventListener('click', toggleTheme);
     document.getElementById('admin-submit').addEventListener('click', handleAdminLogin);
     document.getElementById('admin-cancel').addEventListener('click', hideAdminModal);
     document.getElementById('modal-submit').addEventListener('click', handlePasswordSubmit);
@@ -166,21 +169,34 @@ async function loadPosts() {
 
 function renderPosts() {
     const start = (state.currentPage - 1) * state.postsPerPage, end = start + state.postsPerPage;
-    elements.postList.innerHTML = state.posts.slice(start, end).map((post, i) => {
+    const wrapper = document.querySelector('.board-table-wrapper');
+    wrapper.innerHTML = state.posts.slice(start, end).map((post, i) => {
         const country = post.country ? `[${post.country}]` : '';
         const author = state.isAdmin ? (post.data?.name || '익명') : '익명';
-        let dateHtml = '';
+        let dateText = '';
         if (post.created_at) {
             const d = new Date(post.created_at);
-            // UTC를 KST로 변환 (+9시간)
             const kst = new Date(d.getTime() + (9 * 60 * 60 * 1000));
-            const datePart = kst.toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' });
-            const timePart = kst.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-            dateHtml = `${datePart}<br>${timePart}`;
+            dateText = kst.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
         }
-        return `<tr data-id="${post.id}"><td class="col-no" style="text-align:center">${state.posts.length - start - i}</td><td class="col-title"><div class="post-title"><svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>${country} 구조요청</span></div></td><td class="col-author">${escapeHtml(author)}</td><td class="col-date">${dateHtml}</td></tr>`;
+        return `
+            <div class="post-card" data-id="${post.id}">
+                <div class="post-card-header">
+                    <span class="post-card-number">No.${state.posts.length - start - i}</span>
+                    <span class="post-card-date">${dateText}</span>
+                </div>
+                <div class="post-card-title">
+                    <svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    ${country} 구조요청
+                </div>
+                <div class="post-card-author">${escapeHtml(author)}</div>
+            </div>
+        `;
     }).join('');
-    elements.postList.querySelectorAll('tr').forEach(row => row.addEventListener('click', () => handlePostClick(row.dataset.id)));
+    wrapper.querySelectorAll('.post-card').forEach(card => card.addEventListener('click', () => handlePostClick(card.dataset.id)));
     renderPagination();
 }
 
@@ -821,6 +837,27 @@ function downloadCSV() {
 function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 function showLoading() { elements.loadingOverlay.classList.remove('hidden'); }
 function hideLoading() { elements.loadingOverlay.classList.add('hidden'); }
+
+// 다크모드 관련 함수
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+}
+
+function updateThemeIcon(theme) {
+    if (elements.themeToggle) {
+        elements.themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+}
 
 window.addFamilyRow = addFamilyRow;
 window.removeLastFamilyRow = removeLastFamilyRow;
