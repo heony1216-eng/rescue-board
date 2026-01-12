@@ -840,9 +840,27 @@ function hideLoading() { elements.loadingOverlay.classList.add('hidden'); }
 
 // 다크모드 관련 함수
 function initTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    updateThemeIcon(savedTheme);
+    // 저장된 테마가 있으면 사용, 없으면 시스템 설정 감지
+    let theme = localStorage.getItem('theme');
+
+    if (!theme) {
+        // 시스템 다크모드 설정 확인
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        theme = prefersDark ? 'dark' : 'light';
+    }
+
+    document.documentElement.setAttribute('data-theme', theme);
+    updateThemeIcon(theme);
+
+    // 시스템 테마 변경 감지
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        // 사용자가 수동으로 설정하지 않았을 때만 시스템 설정 따라감
+        if (!localStorage.getItem('theme')) {
+            const newTheme = e.matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+    });
 }
 
 function toggleTheme() {
