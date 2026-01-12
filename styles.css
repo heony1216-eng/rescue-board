@@ -108,7 +108,7 @@ body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-seri
 .form-group small { display: block; margin-top: 6px; color: var(--text-muted); font-size: 12px; }
 .required { color: var(--primary-color); font-weight: 700; }
 
-.form-document { border: 1px solid var(--border-color); padding: 24px; margin-top: 24px; border-radius: var(--radius-sm); background: var(--white); box-shadow: var(--shadow-sm); }
+.form-document { border: none; padding: 0; margin-top: 24px; border-radius: 0; background: transparent; box-shadow: none; }
 .doc-header { margin-bottom: 24px; }
 .doc-title { font-size: 20px; font-weight: 700; text-align: center; margin: 20px 0; color: var(--text-dark); }
 .section-title { font-size: 16px; font-weight: 700; margin: 24px 0 12px; color: var(--text-dark); }
@@ -201,97 +201,6 @@ body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-seri
 .view-text { display: inline-block; padding: 6px 8px; min-height: 20px; }
 .view-textarea { min-height: 60px; white-space: pre-wrap; border: 1px solid #ddd; padding: 10px; background: #fff; border-radius: 4px; }
 
-/* 반응형 */
-@media (max-width: 768px) {
-    .container { padding: 20px 16px 60px; }
-    .header { padding: 16px 0 12px 0; margin-bottom: 20px; }
-    .header h1 { font-size: 16px; }
-    .kst-clock { font-size: 11px; }
-    .theme-toggle { top: 16px; right: 16px; width: 36px; height: 36px; font-size: 16px; }
-
-    .board-section { padding: 0; }
-    .board-header { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-    .board-title { font-size: 18px; }
-    .admin-login { width: 100%; gap: 6px; }
-    .admin-login .btn { flex: 1; min-width: 0; padding: 10px 12px; font-size: 13px; }
-
-    .post-card { padding: 16px; }
-    .post-card-title { font-size: 15px; }
-
-    .board-footer { margin-top: 24px; gap: 12px; }
-    .btn-write { width: 100%; }
-
-    .form-section { padding: 0; }
-    .form-header { margin-bottom: 20px; padding-bottom: 16px; }
-    .form-header h2 { font-size: 18px; }
-    .form-document { padding: 20px 16px; border-radius: 10px; }
-    .doc-title { font-size: 16px; }
-    .section-title { font-size: 15px; }
-    
-    /* 모든 테이블 공통 스타일 */
-    .table-section { margin-bottom: 15px; }
-    .table-section-title { display: none; }
-    .section-label-header { display: block; width: 100%; background: var(--primary-color); color: #fff; padding: 12px 15px; border-radius: 8px 8px 0 0; font-weight: 700; }
-    .section-label-header .required { color: #fff; }
-    
-    .data-table { display: block; width: 100%; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
-    .data-table.no-header { border-radius: 0 0 8px 8px; border-top: none; margin-bottom: 0; }
-    .data-table thead { display: none; }
-    .data-table tbody { display: block; width: 100%; padding: 15px; background: #fff; }
-    .data-table tr { display: block; border: none; padding: 0; margin: 0; background: none; }
-    .data-table tr + tr { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
-    .data-table td { display: block; width: 100% !important; border: none; padding: 0; margin-bottom: 12px; text-align: left !important; }
-    .data-table td:last-child { margin-bottom: 0; }
-    .data-table .section-label { display: none; }
-    
-    /* 필드 라벨 */
-    .data-table .label-cell { display: block; background: none; font-weight: 600; color: #333; font-size: 12px; padding: 0 0 4px 0; margin-bottom: 4px; }
-    .data-table .form-input { width: 100%; }
-    
-    /* 가족사항 */
-    .section-header-row { display: block; margin-bottom: 0; }
-    .section-label-inline { display: block; width: 100%; background: var(--primary-color); color: #fff !important; padding: 12px 15px; border-radius: 8px 8px 0 0; font-weight: 700; box-sizing: border-box; }
-    .section-label-inline .required { color: #fff !important; }
-    .dynamic-section { margin-bottom: 15px; }
-    #family-table, #family-table-view { border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; margin-top: 0; }
-    #family-table tbody, #family-table-view tbody { padding: 15px; }
-    #family-table tr, #family-table-view tr { border: none; margin: 0; padding: 0; }
-    #family-table tr + tr, #family-table-view tr + tr { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
-    #family-table td, #family-table-view td { margin-bottom: 12px; }
-    #family-table td:last-child, #family-table-view td:last-child { margin-bottom: 0; }
-    #family-table td:before, #family-table-view td:before { content: attr(data-label); font-weight: 600; display: block; margin-bottom: 4px; color: #333; font-size: 12px; }
-    
-    /* 가족사항 상세내용 */
-    #family-table tfoot, #family-table-view tfoot { display: block; border-top: 1px solid #ddd; }
-    #family-table tfoot tr, #family-table-view tfoot tr { display: block; padding: 15px; margin: 0; border: none; }
-    #family-table tfoot td, #family-table-view tfoot td { display: block; width: 100% !important; margin: 0; }
-    #family-table tfoot td:before, #family-table-view tfoot td:before { display: none; }
-    .detail-row { background: #f9f9f9; }
-    .detail-label { font-weight: 600; margin-bottom: 8px; font-size: 13px; }
-    .family-detail, .view-textarea { width: 100% !important; min-height: 60px; box-sizing: border-box; }
-    
-    /* 예산안 - 회색 */
-    .budget-table-header { display: block; background: #666; color: #fff; padding: 12px 15px; border-radius: 8px 8px 0 0; font-weight: 700; }
-    #budget-table { border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px; }
-    #budget-table tbody { padding: 15px; }
-    #budget-table tbody tr { border: none; margin: 0; padding: 0; }
-    #budget-table tbody tr + tr { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
-    #budget-table tbody td { margin-bottom: 12px; }
-    #budget-table tbody td:last-child { margin-bottom: 0; }
-    #budget-table tbody td:before { content: attr(data-label); font-weight: 600; display: block; margin-bottom: 4px; color: #333; font-size: 12px; }
-    
-    .budget-table tfoot { display: block; border-top: 1px solid #ddd; padding: 12px 15px; background: #f9f9f9; border-radius: 0 0 8px 8px; }
-    .budget-table tfoot tr { display: flex; justify-content: space-between; align-items: center; padding: 0; border: none; margin: 0; }
-    .budget-table tfoot td { display: inline-block; width: auto !important; padding: 0; margin: 0; }
-    .budget-table tfoot td:first-child { font-weight: 600; }
-    .budget-table tfoot td:before { display: none; }
-    
-    .row-actions { justify-content: flex-end; margin-top: 10px; }
-    .section-header-row { flex-wrap: wrap; margin-bottom: 0; }
-    .post-actions { justify-content: center; }
-    .post-actions .btn { flex: 1; min-width: 70px; padding: 8px; font-size: 12px; }
-    .file-preview-grid { grid-template-columns: repeat(2, 1fr); }
-}
 
 /* 인쇄 스타일 */
 @media print {
