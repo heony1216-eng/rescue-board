@@ -9,6 +9,14 @@ const supabase = {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': options.prefer || 'return=representation', ...options.headers }
         });
     },
+    async rpc(functionName, params = {}) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${functionName}`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        return res.json();
+    },
     async uploadFile(file, path) {
         const res = await fetch(`${SUPABASE_URL}/storage/v1/object/attachments/${path}`, {
             method: 'POST',
@@ -22,7 +30,7 @@ const supabase = {
     }
 };
 
-const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, selectedFiles: [], currentPostId: null, isEditing: false, editingPostId: null, uploadProgress: 0 };
+const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, selectedFiles: [], currentPostId: null, isEditing: false, editingPostId: null, uploadProgress: 0 };
 let elements = {};
 
 function initElements() {
@@ -74,7 +82,6 @@ function initElements() {
 document.addEventListener('DOMContentLoaded', () => {
     initElements();
     loadPosts();
-    loadAdminPassword();
     setupEventListeners();
     setCurrentDate();
     startKSTClock();
@@ -110,13 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     history.replaceState({ page: 'list' }, '', window.location.pathname);
 });
 
-async function loadAdminPassword() {
-    try {
-        const res = await supabase.fetch('admin?select=password&limit=1');
-        const data = await res.json();
-        if (data && data.length > 0) state.adminPassword = data[0].password;
-    } catch (e) { console.error(e); }
-}
+// loadAdminPassword 제거됨 - 보안 취약점 수정: 비밀번호는 서버에서만 검증
 
 function startKSTClock() {
     const update = () => {
@@ -177,7 +178,8 @@ function setupEventListeners() {
 
 async function loadPosts() {
     try {
-        const res = await supabase.fetch('posts?select=*&order=created_at.desc');
+        // password 필드 제외 - 보안 취약점 수정
+        const res = await supabase.fetch('posts?select=id,country,doc_number,data,attachments,created_at&order=created_at.desc');
         state.posts = await res.json() || [];
     } catch (e) { state.posts = []; }
     renderPosts();
@@ -340,12 +342,20 @@ function handlePostClick(postId) {
 
 function showPasswordModal() { elements.passwordModal.classList.remove('hidden'); document.getElementById('modal-password').value = ''; document.getElementById('modal-password').focus(); }
 function hidePasswordModal() { elements.passwordModal.classList.add('hidden'); }
-function handlePasswordSubmit() {
+async function handlePasswordSubmit() {
     const pw = document.getElementById('modal-password').value;
     const post = state.posts.find(p => p.id === state.currentPostId);
     if (!post) { hidePasswordModal(); return; }
-    if (pw === post.password || pw === state.adminPassword) { hidePasswordModal(); showViewPost(post); }
-    else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('modal-password').value = ''; }
+
+    // 서버사이드 비밀번호 검증
+    try {
+        const isValid = await supabase.rpc('verify_post_password', { target_post_id: state.currentPostId, input_password: pw });
+        if (isValid) { hidePasswordModal(); showViewPost(post); }
+        else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('modal-password').value = ''; }
+    } catch (e) {
+        console.error(e);
+        alert('오류가 발생했습니다.');
+    }
 }
 
 function showAdminModal() {
@@ -376,28 +386,39 @@ function showAdminModal() {
     document.getElementById('admin-password').focus();
 }
 function hideAdminModal() { elements.adminModal.classList.add('hidden'); }
-function handleAdminLogin() {
+async function handleAdminLogin() {
     const pw = document.getElementById('admin-password').value;
     const rememberCheckbox = document.getElementById('remember-admin-password');
 
-    if (pw === state.adminPassword) {
-        state.isAdmin = true;
-        localStorage.setItem('isAdmin', 'true');
+    try {
+        // 서버사이드 관리자 비밀번호 검증
+        const isValid = await supabase.rpc('verify_admin_password', { input_password: pw });
 
-        // 비밀번호 저장 체크박스 확인
-        if (rememberCheckbox.checked) {
-            localStorage.setItem('savedAdminPassword', pw);
+        if (isValid) {
+            state.isAdmin = true;
+            localStorage.setItem('isAdmin', 'true');
+
+            // 비밀번호 저장 체크박스 확인
+            if (rememberCheckbox.checked) {
+                localStorage.setItem('savedAdminPassword', pw);
+            } else {
+                localStorage.removeItem('savedAdminPassword');
+            }
+
+            elements.adminBtn.textContent = '관리자 로그아웃';
+            elements.adminBtn.classList.add('logged-in');
+            elements.csvBtn.classList.remove('hidden');
+            hideAdminModal();
+            renderPosts();
+            alert('관리자로 로그인되었습니다.');
         } else {
-            localStorage.removeItem('savedAdminPassword');
+            alert('비밀번호가 일치하지 않습니다.');
+            document.getElementById('admin-password').value = '';
         }
-
-        elements.adminBtn.textContent = '관리자 로그아웃';
-        elements.adminBtn.classList.add('logged-in');
-        elements.csvBtn.classList.remove('hidden');
-        hideAdminModal();
-        renderPosts();
-        alert('관리자로 로그인되었습니다.');
-    } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('admin-password').value = ''; }
+    } catch (e) {
+        console.error(e);
+        alert('오류가 발생했습니다.');
+    }
 }
 
 function showDeleteModal() { elements.deleteModal.classList.remove('hidden'); document.getElementById('delete-password').value = ''; document.getElementById('delete-password').focus(); }
@@ -407,10 +428,11 @@ async function handleDeleteConfirm() {
     if (!pw) { alert('비밀번호를 입력하세요.'); return; }
     showLoading();
     try {
+        // admin_pw를 클라이언트에서 전송하지 않음 - 서버에서 직접 조회
         const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_post`, {
             method: 'POST',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ post_id: state.currentPostId, input_password: pw, admin_pw: state.adminPassword })
+            body: JSON.stringify({ post_id: state.currentPostId, input_password: pw })
         });
         const result = await res.json();
         hideDeleteModal(); hideLoading();
@@ -425,16 +447,27 @@ async function handleDeleteConfirm() {
 
 function showEditModal() { elements.editModal.classList.remove('hidden'); document.getElementById('edit-password').value = ''; document.getElementById('edit-password').focus(); }
 function hideEditModal() { elements.editModal.classList.add('hidden'); }
-function handleEditConfirm() {
+async function handleEditConfirm() {
     const pw = document.getElementById('edit-password').value;
     const post = state.posts.find(p => p.id === state.currentPostId);
     if (!post) { hideEditModal(); return; }
-    if (pw === post.password || pw === state.adminPassword) {
-        hideEditModal();
-        state.isEditing = true;
-        state.editingPostId = state.currentPostId;
-        showEditForm(post);
-    } else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('edit-password').value = ''; }
+
+    try {
+        // 서버사이드 비밀번호 검증
+        const isValid = await supabase.rpc('verify_post_password', { target_post_id: state.currentPostId, input_password: pw });
+        if (isValid) {
+            hideEditModal();
+            state.isEditing = true;
+            state.editingPostId = state.currentPostId;
+            showEditForm(post);
+        } else {
+            alert('비밀번호가 일치하지 않습니다.');
+            document.getElementById('edit-password').value = '';
+        }
+    } catch (e) {
+        console.error(e);
+        alert('오류가 발생했습니다.');
+    }
 }
 
 function showEditForm(post) {
@@ -450,7 +483,7 @@ function showEditForm(post) {
     })() : getKSTDate();
     document.getElementById('password').value = post.password;
     const d = post.data;
-    ['position','country_city','name','illegal_reason','contact','illegal_period','current_address','korea_address','recommender_name','recommender_contact','recommender_org','recommender_email','recommender_address','local_life','health_status','return_plan','case_history','expert_opinion'].forEach(n => {
+    ['position', 'country_city', 'name', 'illegal_reason', 'contact', 'illegal_period', 'current_address', 'korea_address', 'recommender_name', 'recommender_contact', 'recommender_org', 'recommender_email', 'recommender_address', 'local_life', 'health_status', 'return_plan', 'case_history', 'expert_opinion'].forEach(n => {
         const f = document.querySelector(`[name="${n}"]`); if (f) f.value = d[n] || '';
     });
     // 가족 행 복원
@@ -458,7 +491,7 @@ function showEditForm(post) {
     elements.familyRows.innerHTML = '';
     (families.length ? families : [{}]).forEach(fam => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td data-label="성명"><input type="text" name="family_name[]" class="form-input" value="${escapeHtml(fam.name||'')}"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input" value="${escapeHtml(fam.relation||'')}"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input" value="${escapeHtml(fam.age||'')}"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input" value="${escapeHtml(fam.contact||'')}"></td>`;
+        tr.innerHTML = `<td data-label="성명"><input type="text" name="family_name[]" class="form-input" value="${escapeHtml(fam.name || '')}"></td><td data-label="관계"><input type="text" name="family_relation[]" class="form-input" value="${escapeHtml(fam.relation || '')}"></td><td data-label="나이"><input type="text" name="family_age[]" class="form-input" value="${escapeHtml(fam.age || '')}"></td><td data-label="연락처"><input type="text" name="family_contact[]" class="form-input" value="${escapeHtml(fam.contact || '')}"></td>`;
         elements.familyRows.appendChild(tr);
     });
     // 상세내용 복원
@@ -471,7 +504,7 @@ function showEditForm(post) {
     elements.budgetRows.innerHTML = '';
     (budgets.length ? budgets : [{}]).forEach(b => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td data-label="세부항목"><input type="text" name="budget_item[]" class="form-input" value="${escapeHtml(b.item||'')}"></td><td data-label="산출근거"><input type="text" name="budget_basis[]" class="form-input" value="${escapeHtml(b.basis||'')}"></td><td data-label="금액"><input type="text" name="budget_amount[]" class="form-input" value="${escapeHtml(b.amount||'')}" oninput="calcBudgetTotal()"></td>`;
+        tr.innerHTML = `<td data-label="세부항목"><input type="text" name="budget_item[]" class="form-input" value="${escapeHtml(b.item || '')}"></td><td data-label="산출근거"><input type="text" name="budget_basis[]" class="form-input" value="${escapeHtml(b.basis || '')}"></td><td data-label="금액"><input type="text" name="budget_amount[]" class="form-input" value="${escapeHtml(b.amount || '')}" oninput="calcBudgetTotal()"></td>`;
         elements.budgetRows.appendChild(tr);
     });
     elements.budgetTotal.value = d.budget_total || '';
@@ -619,10 +652,9 @@ async function handleSubmit(e) {
             const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_post`, {
                 method: 'POST',
                 headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    post_id: state.editingPostId, 
-                    input_password: pw, 
-                    admin_pw: state.adminPassword,
+                body: JSON.stringify({
+                    post_id: state.editingPostId,
+                    input_password: pw,
                     new_country: country,
                     new_doc_number: elements.docNumber.value,
                     new_data: data,
@@ -653,28 +685,28 @@ function renderPostContent(post) {
         const kst = new Date(d.getTime() + (9 * 60 * 60 * 1000));
         return kst.toLocaleString('ko-KR');
     })() : '';
-    
+
     // 가족사항 행
     const famRows = (d.families || []).map(f => `
         <tr>
-            <td data-label="성명"><span class="view-text">${escapeHtml(f.name||'')}</span></td>
-            <td data-label="관계"><span class="view-text">${escapeHtml(f.relation||'')}</span></td>
-            <td data-label="나이"><span class="view-text">${escapeHtml(f.age||'')}</span></td>
-            <td data-label="연락처"><span class="view-text">${escapeHtml(f.contact||'')}</span></td>
+            <td data-label="성명"><span class="view-text">${escapeHtml(f.name || '')}</span></td>
+            <td data-label="관계"><span class="view-text">${escapeHtml(f.relation || '')}</span></td>
+            <td data-label="나이"><span class="view-text">${escapeHtml(f.age || '')}</span></td>
+            <td data-label="연락처"><span class="view-text">${escapeHtml(f.contact || '')}</span></td>
         </tr>
     `).join('') || '<tr><td colspan="4">-</td></tr>';
-    
+
     const famDetail = (d.families && d.families[0]) ? d.families[0].detail || '' : '';
-    
+
     // 예산 행
     const budRows = (d.budgets || []).map(b => `
         <tr>
-            <td data-label="세부항목"><span class="view-text">${escapeHtml(b.item||'')}</span></td>
-            <td data-label="산출근거"><span class="view-text">${escapeHtml(b.basis||'')}</span></td>
-            <td data-label="금액"><span class="view-text">${escapeHtml(b.amount||'')}</span></td>
+            <td data-label="세부항목"><span class="view-text">${escapeHtml(b.item || '')}</span></td>
+            <td data-label="산출근거"><span class="view-text">${escapeHtml(b.basis || '')}</span></td>
+            <td data-label="금액"><span class="view-text">${escapeHtml(b.amount || '')}</span></td>
         </tr>
     `).join('') || '<tr><td colspan="3">-</td></tr>';
-    
+
     // 첨부파일
     const attHtml = post.attachments?.length ? `
         <h2 class="section-title">첨부파일</h2>
@@ -690,21 +722,21 @@ function renderPostContent(post) {
             `).join('')}
         </div>
     ` : '';
-    
+
     elements.postContent.innerHTML = `
         <div class="form-document" id="print-area">
             <div class="doc-header">
                 <table class="info-table">
                     <tr>
                         <td class="label-cell">문서번호</td>
-                        <td class="value-cell"><span class="view-text">${escapeHtml(post.doc_number||'')}</span></td>
+                        <td class="value-cell"><span class="view-text">${escapeHtml(post.doc_number || '')}</span></td>
                     </tr>
                 </table>
                 <h1 class="doc-title">Intake Report (구조 요청 신청서)</h1>
                 <table class="info-table">
                     <tr>
                         <td class="label-cell">담당/직책</td>
-                        <td class="value-cell"><span class="view-text">${escapeHtml(d.position||'')}</span></td>
+                        <td class="value-cell"><span class="view-text">${escapeHtml(d.position || '')}</span></td>
                         <td class="label-cell">작성일</td>
                         <td class="value-cell"><span class="view-text">${dateStr}</span></td>
                     </tr>
@@ -719,27 +751,27 @@ function renderPostContent(post) {
                 <table class="data-table no-header">
                     <tr>
                         <td class="label-cell">국가/도시</td>
-                        <td colspan="3"><span class="view-text">${escapeHtml(d.country_city||'')}</span></td>
+                        <td colspan="3"><span class="view-text">${escapeHtml(d.country_city || '')}</span></td>
                     </tr>
                     <tr>
                         <td class="label-cell">이름</td>
-                        <td><span class="view-text">${escapeHtml(d.name||'')}</span></td>
+                        <td><span class="view-text">${escapeHtml(d.name || '')}</span></td>
                         <td class="label-cell">불법체류사유</td>
-                        <td><span class="view-text">${escapeHtml(d.illegal_reason||'')}</span></td>
+                        <td><span class="view-text">${escapeHtml(d.illegal_reason || '')}</span></td>
                     </tr>
                     <tr>
                         <td class="label-cell">연락처</td>
-                        <td><span class="view-text">${escapeHtml(d.contact||'')}</span></td>
+                        <td><span class="view-text">${escapeHtml(d.contact || '')}</span></td>
                         <td class="label-cell">불법체류기간</td>
-                        <td><span class="view-text">${escapeHtml(d.illegal_period||'')}</span></td>
+                        <td><span class="view-text">${escapeHtml(d.illegal_period || '')}</span></td>
                     </tr>
                     <tr>
                         <td class="label-cell">현재주소</td>
-                        <td colspan="3"><span class="view-text">${escapeHtml(d.current_address||'')}</span></td>
+                        <td colspan="3"><span class="view-text">${escapeHtml(d.current_address || '')}</span></td>
                     </tr>
                     <tr>
                         <td class="label-cell">한국 주소</td>
-                        <td colspan="3"><span class="view-text">${escapeHtml(d.korea_address||'')}</span></td>
+                        <td colspan="3"><span class="view-text">${escapeHtml(d.korea_address || '')}</span></td>
                     </tr>
                 </table>
             </div>
@@ -750,19 +782,19 @@ function renderPostContent(post) {
                 <table class="data-table no-header">
                     <tr>
                         <td class="label-cell">성명</td>
-                        <td><span class="view-text">${escapeHtml(d.recommender_name||'')}</span></td>
+                        <td><span class="view-text">${escapeHtml(d.recommender_name || '')}</span></td>
                         <td class="label-cell">연락처</td>
-                        <td><span class="view-text">${escapeHtml(d.recommender_contact||'')}</span></td>
+                        <td><span class="view-text">${escapeHtml(d.recommender_contact || '')}</span></td>
                     </tr>
                     <tr>
                         <td class="label-cell">소속 기관</td>
-                        <td><span class="view-text">${escapeHtml(d.recommender_org||'')}</span></td>
+                        <td><span class="view-text">${escapeHtml(d.recommender_org || '')}</span></td>
                         <td class="label-cell">이메일</td>
-                        <td><span class="view-text">${escapeHtml(d.recommender_email||'')}</span></td>
+                        <td><span class="view-text">${escapeHtml(d.recommender_email || '')}</span></td>
                     </tr>
                     <tr>
                         <td class="label-cell">기관 주소</td>
-                        <td colspan="3"><span class="view-text">${escapeHtml(d.recommender_address||'')}</span></td>
+                        <td colspan="3"><span class="view-text">${escapeHtml(d.recommender_address || '')}</span></td>
                     </tr>
                 </table>
             </div>
@@ -808,7 +840,7 @@ function renderPostContent(post) {
                     <tfoot>
                         <tr>
                             <td colspan="2" class="label-cell">합계</td>
-                            <td><span class="view-text">${escapeHtml(d.budget_total||'')}</span></td>
+                            <td><span class="view-text">${escapeHtml(d.budget_total || '')}</span></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -818,23 +850,23 @@ function renderPostContent(post) {
 
             <div class="detail-section">
                 <div class="detail-header"><span class="detail-title"><span class="required">* 현지 생활 현황</span></span></div>
-                <div class="view-textarea">${escapeHtml(d.local_life||'')}</div>
+                <div class="view-textarea">${escapeHtml(d.local_life || '')}</div>
             </div>
             <div class="detail-section">
                 <div class="detail-header"><span class="detail-title"><span class="required">* 건강상태</span></span></div>
-                <div class="view-textarea">${escapeHtml(d.health_status||'')}</div>
+                <div class="view-textarea">${escapeHtml(d.health_status || '')}</div>
             </div>
             <div class="detail-section">
                 <div class="detail-header"><span class="detail-title"><span class="required">* 귀국 후 계획</span></span></div>
-                <div class="view-textarea">${escapeHtml(d.return_plan||'')}</div>
+                <div class="view-textarea">${escapeHtml(d.return_plan || '')}</div>
             </div>
             <div class="detail-section">
                 <div class="detail-header"><span class="detail-title"><span class="required">* 사례 접수 경위</span></span></div>
-                <div class="view-textarea">${escapeHtml(d.case_history||'')}</div>
+                <div class="view-textarea">${escapeHtml(d.case_history || '')}</div>
             </div>
             <div class="detail-section">
                 <div class="detail-header"><span class="detail-title">전문가 의견</span></div>
-                <div class="view-textarea">${escapeHtml(d.expert_opinion||'')}</div>
+                <div class="view-textarea">${escapeHtml(d.expert_opinion || '')}</div>
             </div>
 
             ${attHtml}
@@ -852,7 +884,7 @@ function generatePDF() {
 function generateWord() {
     const el = document.getElementById('print-area');
     if (!el) return alert('워드 생성 영역이 없습니다.');
-    
+
     const styles = `
         <style>
             body { font-family: '맑은 고딕', sans-serif; font-size: 11pt; }
@@ -865,7 +897,7 @@ function generateWord() {
             .view-textarea { border: 1px solid #ddd; padding: 8px; min-height: 40px; }
         </style>
     `;
-    
+
     const html = `
         <!DOCTYPE html>
         <html>
@@ -878,7 +910,7 @@ function generateWord() {
         </body>
         </html>
     `;
-    
+
     const converted = htmlDocx.asBlob(html);
     const link = document.createElement('a');
     link.href = URL.createObjectURL(converted);
@@ -888,10 +920,10 @@ function generateWord() {
 
 function downloadCSV() {
     if (!state.posts.length) return alert('데이터가 없습니다.');
-    const headers = ['문서번호','작성일','국가/도시','이름','연락처','불법체류사유','불법체류기간','현재주소','한국주소'];
+    const headers = ['문서번호', '작성일', '국가/도시', '이름', '연락처', '불법체류사유', '불법체류기간', '현재주소', '한국주소'];
     const rows = state.posts.map(p => {
         const d = p.data;
-        return [p.doc_number||'', p.created_at||'', d.country_city||'', d.name||'', d.contact||'', d.illegal_reason||'', d.illegal_period||'', d.current_address||'', d.korea_address||''].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+        return [p.doc_number || '', p.created_at || '', d.country_city || '', d.name || '', d.contact || '', d.illegal_reason || '', d.illegal_period || '', d.current_address || '', d.korea_address || ''].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
     });
     const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
