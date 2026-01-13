@@ -62,7 +62,12 @@ function initElements() {
         kstClock: document.getElementById('kst-clock'),
         familyRows: document.getElementById('family-rows'),
         budgetRows: document.getElementById('budget-rows'),
-        budgetTotal: document.getElementById('budget-total')
+        budgetTotal: document.getElementById('budget-total'),
+        commentList: document.getElementById('comment-list'),
+        commentInput: document.getElementById('comment-input'),
+        commentSubmit: document.getElementById('comment-submit'),
+        commentSection: document.getElementById('comment-section'),
+        commentCount: document.getElementById('comment-count')
     };
 }
 
@@ -74,6 +79,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setCurrentDate();
     startKSTClock();
     initTheme();
+    // 댓글 섹션 초기 숨김 처리
+    if (elements.commentSection) {
+        elements.commentSection.classList.add('hidden');
+    }
     // 관리자 상태 복원
     if (localStorage.getItem('isAdmin') === 'true') {
         state.isAdmin = true;
@@ -152,6 +161,13 @@ function setupEventListeners() {
     elements.uploadZone.addEventListener('dragleave', (e) => { e.preventDefault(); elements.uploadZone.classList.remove('dragover'); });
     elements.uploadZone.addEventListener('drop', (e) => { e.preventDefault(); elements.uploadZone.classList.remove('dragover'); processFiles(Array.from(e.dataTransfer.files)); });
     elements.fileInput.addEventListener('change', (e) => processFiles(Array.from(e.target.files)));
+    elements.commentSubmit?.addEventListener('click', handleCommentSubmit);
+    elements.commentInput?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            handleCommentSubmit();
+        }
+    });
     ['modal-password', 'admin-password', 'delete-password', 'edit-password'].forEach(id => {
         document.getElementById(id)?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') document.getElementById(id.replace('-password', '-submit') || id.replace('-password', '-confirm'))?.click();
@@ -214,6 +230,10 @@ function showBoardList() {
     elements.boardList.classList.remove('hidden');
     elements.writeForm.classList.add('hidden');
     elements.viewPost.classList.add('hidden');
+    // 댓글 섹션 숨기기
+    if (elements.commentSection) {
+        elements.commentSection.classList.add('hidden');
+    }
     loadPosts();
     window.scrollTo(0, 0);
     history.pushState({ page: 'list' }, '', window.location.pathname);
@@ -223,6 +243,10 @@ function showBoardListNoHistory() {
     elements.boardList.classList.remove('hidden');
     elements.writeForm.classList.add('hidden');
     elements.viewPost.classList.add('hidden');
+    // 댓글 섹션 숨기기
+    if (elements.commentSection) {
+        elements.commentSection.classList.add('hidden');
+    }
     loadPosts();
     window.scrollTo(0, 0);
 }
@@ -231,6 +255,10 @@ function showWriteForm() {
     elements.boardList.classList.add('hidden');
     elements.writeForm.classList.remove('hidden');
     elements.viewPost.classList.add('hidden');
+    // 댓글 섹션 숨기기
+    if (elements.commentSection) {
+        elements.commentSection.classList.add('hidden');
+    }
     state.isEditing = false;
     state.editingPostId = null;
     elements.writeForm.querySelector('.form-header h2').textContent = '구조 요청 신청서 작성';
@@ -244,6 +272,10 @@ function showWriteFormNoHistory() {
     elements.boardList.classList.add('hidden');
     elements.writeForm.classList.remove('hidden');
     elements.viewPost.classList.add('hidden');
+    // 댓글 섹션 숨기기
+    if (elements.commentSection) {
+        elements.commentSection.classList.add('hidden');
+    }
     state.isEditing = false;
     state.editingPostId = null;
     elements.writeForm.querySelector('.form-header h2').textContent = '구조 요청 신청서 작성';
@@ -258,6 +290,11 @@ function showViewPost(post) {
     elements.viewPost.classList.remove('hidden');
     state.currentPostId = post.id;
     renderPostContent(post);
+    loadComments(post.id);
+    // 댓글 섹션 표시
+    if (elements.commentSection) {
+        elements.commentSection.classList.remove('hidden');
+    }
     // 관리자일 때만 PDF/워드 버튼 보이기
     document.getElementById('pdf-post-btn')?.classList.toggle('hidden', !state.isAdmin);
     document.getElementById('word-post-btn')?.classList.toggle('hidden', !state.isAdmin);
@@ -271,6 +308,11 @@ function showViewPostNoHistory(post) {
     elements.viewPost.classList.remove('hidden');
     state.currentPostId = post.id;
     renderPostContent(post);
+    loadComments(post.id);
+    // 댓글 섹션 표시
+    if (elements.commentSection) {
+        elements.commentSection.classList.remove('hidden');
+    }
     // 관리자일 때만 PDF/워드 버튼 보이기
     document.getElementById('pdf-post-btn')?.classList.toggle('hidden', !state.isAdmin);
     document.getElementById('word-post-btn')?.classList.toggle('hidden', !state.isAdmin);
@@ -898,6 +940,246 @@ function updateThemeIcon(theme) {
         elements.themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
     }
 }
+
+// 댓글 기능
+async function loadComments(postId) {
+    try {
+        const res = await supabase.fetch(`comments?post_id=eq.${postId}&select=*&order=created_at.asc`);
+        const comments = await res.json() || [];
+        renderComments(comments);
+    } catch (e) {
+        console.error('댓글 로드 실패:', e);
+        if (elements.commentList) {
+            elements.commentList.innerHTML = '<div class="comment-empty">댓글을 불러올 수 없습니다.</div>';
+        }
+        if (elements.commentCount) {
+            elements.commentCount.textContent = '0';
+        }
+    }
+}
+
+function renderComments(comments) {
+    if (!elements.commentList) return;
+
+    // 댓글 개수 업데이트
+    if (elements.commentCount) {
+        elements.commentCount.textContent = comments?.length || 0;
+    }
+
+    if (!comments || comments.length === 0) {
+        elements.commentList.innerHTML = '<div class="comment-empty">첫 댓글을 남겨보세요.</div>';
+        return;
+    }
+
+    const currentPost = state.posts.find(p => p.id === state.currentPostId);
+    const currentAuthorName = currentPost?.data?.name || '익명';
+
+    const html = comments.map(comment => {
+        const isAdmin = comment.is_admin;
+        const authorName = comment.author_name;
+        const timeStr = formatCommentTime(comment.created_at);
+
+        // 수정/삭제 버튼 표시 조건: 관리자이거나 본인의 댓글인 경우
+        const canModify = state.isAdmin || (!isAdmin && authorName === currentAuthorName);
+
+        const actionsHtml = canModify ? `
+            <div class="comment-actions">
+                <button class="btn-edit-comment" data-id="${comment.id}">수정</button>
+                <button class="btn-delete-comment" data-id="${comment.id}">삭제</button>
+            </div>
+        ` : '';
+
+        return `
+            <div class="comment-item ${isAdmin ? 'admin' : ''}" data-comment-id="${comment.id}">
+                <div class="comment-meta">
+                    <div class="comment-meta-left">
+                        <span class="comment-author ${isAdmin ? 'admin-badge' : ''}">${escapeHtml(authorName)}</span>
+                        <span class="comment-time">${timeStr}</span>
+                    </div>
+                    ${actionsHtml}
+                </div>
+                <div class="comment-content" data-original-content="${escapeHtml(comment.content)}">${escapeHtml(comment.content)}</div>
+            </div>
+        `;
+    }).join('');
+
+    elements.commentList.innerHTML = html;
+
+    // 수정/삭제 버튼 이벤트 리스너 등록
+    elements.commentList.querySelectorAll('.btn-edit-comment').forEach(btn => {
+        btn.addEventListener('click', () => handleEditComment(btn.dataset.id));
+    });
+    elements.commentList.querySelectorAll('.btn-delete-comment').forEach(btn => {
+        btn.addEventListener('click', () => handleDeleteComment(btn.dataset.id));
+    });
+}
+
+
+function formatCommentTime(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const kst = new Date(d.getTime() + (9 * 60 * 60 * 1000));
+    const now = new Date();
+    const diff = now - kst;
+
+    // 1분 미만
+    if (diff < 60000) return '방금 전';
+    // 1시간 미만
+    if (diff < 3600000) return Math.floor(diff / 60000) + '분 전';
+    // 24시간 미만
+    if (diff < 86400000) return Math.floor(diff / 3600000) + '시간 전';
+
+    // 그 외는 날짜 표시
+    return kst.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+async function handleCommentSubmit() {
+    const content = elements.commentInput?.value.trim();
+
+    if (!content) {
+        alert('댓글 내용을 입력하세요.');
+        return;
+    }
+
+    const post = state.posts.find(p => p.id === state.currentPostId);
+    if (!post) return;
+
+    const isAdmin = state.isAdmin;
+    const authorName = isAdmin ? '관리자' : (post.data?.name || '익명');
+
+    try {
+        showLoading();
+        await supabase.fetch('comments', {
+            method: 'POST',
+            body: JSON.stringify({
+                post_id: state.currentPostId,
+                content: content,
+                author_name: authorName,
+                is_admin: isAdmin
+            })
+        });
+
+        elements.commentInput.value = '';
+        await loadComments(state.currentPostId);
+        hideLoading();
+    } catch (e) {
+        hideLoading();
+        console.error('댓글 등록 실패:', e);
+        alert('댓글 등록에 실패했습니다.');
+    }
+}
+
+function handleEditComment(commentId) {
+    const commentItem = document.querySelector(`.comment-item[data-comment-id="${commentId}"]`);
+    if (!commentItem) return;
+
+    const contentDiv = commentItem.querySelector('.comment-content');
+    const originalContent = contentDiv.getAttribute('data-original-content');
+
+    // 이미 수정 중인 다른 댓글이 있으면 취소
+    document.querySelectorAll('.comment-edit-area').forEach(editArea => {
+        const item = editArea.closest('.comment-item');
+        cancelEditComment(item);
+    });
+
+    // 수정 UI로 변경
+    contentDiv.innerHTML = `
+        <div class="comment-edit-area">
+            <textarea class="edit-textarea">${originalContent}</textarea>
+            <div class="comment-edit-actions">
+                <button class="btn-cancel-edit">취소</button>
+                <button class="btn-save">저장</button>
+            </div>
+        </div>
+    `;
+
+    const textarea = contentDiv.querySelector('.edit-textarea');
+    const saveBtn = contentDiv.querySelector('.btn-save');
+    const cancelBtn = contentDiv.querySelector('.btn-cancel-edit');
+
+    // 포커스
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+    // 저장 버튼
+    saveBtn.addEventListener('click', () => saveEditComment(commentId, textarea.value, commentItem));
+
+    // 취소 버튼
+    cancelBtn.addEventListener('click', () => cancelEditComment(commentItem));
+
+    // Ctrl+Enter로 저장
+    textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            saveEditComment(commentId, textarea.value, commentItem);
+        }
+    });
+}
+
+function cancelEditComment(commentItem) {
+    const contentDiv = commentItem.querySelector('.comment-content');
+    const originalContent = contentDiv.getAttribute('data-original-content');
+    contentDiv.innerHTML = escapeHtml(originalContent);
+}
+
+async function saveEditComment(commentId, newContent, commentItem) {
+    const trimmedContent = newContent.trim();
+
+    if (!trimmedContent) {
+        alert('댓글 내용을 입력하세요.');
+        return;
+    }
+
+    try {
+        showLoading();
+        const res = await supabase.fetch(`comments?id=eq.${commentId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+                content: trimmedContent
+            })
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            console.error('댓글 수정 응답 오류:', error);
+            throw new Error(error.message || '댓글 수정 실패');
+        }
+
+        await loadComments(state.currentPostId);
+        hideLoading();
+    } catch (e) {
+        hideLoading();
+        console.error('댓글 수정 실패:', e);
+        alert('댓글 수정에 실패했습니다: ' + e.message);
+    }
+}
+
+async function handleDeleteComment(commentId) {
+    if (!confirm('댓글을 삭제하시겠습니까?')) {
+        return;
+    }
+
+    try {
+        showLoading();
+        const res = await supabase.fetch(`comments?id=eq.${commentId}`, {
+            method: 'DELETE'
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            console.error('댓글 삭제 응답 오류:', error);
+            throw new Error(error.message || '댓글 삭제 실패');
+        }
+
+        await loadComments(state.currentPostId);
+        hideLoading();
+    } catch (e) {
+        hideLoading();
+        console.error('댓글 삭제 실패:', e);
+        alert('댓글 삭제에 실패했습니다: ' + e.message);
+    }
+}
+
 
 window.addFamilyRow = addFamilyRow;
 window.removeLastFamilyRow = removeLastFamilyRow;

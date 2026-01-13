@@ -162,7 +162,7 @@ body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-seri
 .remove-file { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; background: rgba(240, 68, 82, 0.95); color: var(--white); border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); }
 
 .form-actions { display: flex; justify-content: center; gap: 12px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border-color); }
-.post-actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.post-actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: flex-end; }
 .post-actions .btn { padding: 8px 14px; font-size: 13px; box-shadow: none; font-weight: 500; }
 
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.2s ease; }
@@ -204,6 +204,269 @@ body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-seri
 .view-text { display: inline-block; padding: 6px 8px; min-height: 20px; }
 .view-textarea { min-height: 60px; white-space: pre-wrap; border: 1px solid var(--border-color); padding: 10px; background: var(--white); border-radius: 4px; color: var(--text-dark); }
 
+
+/* 댓글 섹션 */
+.comment-section {
+    margin-top: 40px;
+    padding: 24px;
+    background: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+}
+
+.comment-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.comment-section-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.comment-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    background: var(--primary-color);
+    color: var(--white);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.comment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+    min-height: 100px;
+}
+
+.comment-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 40px 20px;
+}
+
+.comment-item {
+    padding: 16px;
+    background: var(--bg-gray);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.comment-item.admin {
+    background: #fff8e6;
+    border-color: #ffd700;
+}
+
+.comment-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.comment-meta-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.comment-actions button {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: var(--transition);
+    background: transparent;
+    color: var(--text-muted);
+}
+
+.comment-actions button:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-dark);
+}
+
+.comment-actions .btn-delete-comment:hover {
+    color: #dc3545;
+}
+
+.comment-author {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-dark);
+}
+
+.comment-author.admin-badge {
+    color: var(--primary-color);
+}
+
+.comment-author.admin-badge::after {
+    content: ' [관리자]';
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.comment-time {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.comment-content {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-dark);
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.comment-edit-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.comment-edit-area textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+    background: var(--white);
+    color: var(--text-dark);
+}
+
+.comment-edit-area textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.1);
+}
+
+.comment-edit-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.comment-edit-actions button {
+    padding: 6px 12px;
+    font-size: 13px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-weight: 500;
+}
+
+.comment-edit-actions .btn-save {
+    background: var(--primary-color);
+    color: var(--white);
+}
+
+.comment-edit-actions .btn-save:hover {
+    background: var(--primary-dark);
+}
+
+.comment-edit-actions .btn-cancel-edit {
+    background: var(--bg-gray);
+    color: var(--text-dark);
+}
+
+.comment-edit-actions .btn-cancel-edit:hover {
+    background: #d1d5db;
+}
+
+.comment-input-wrapper {
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.comment-input-wrapper textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+    transition: var(--transition);
+    background: var(--white);
+    color: var(--text-dark);
+}
+
+.comment-input-wrapper textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.1);
+}
+
+.comment-input-wrapper .btn-comment-submit {
+    margin-top: 12px;
+    padding: 12px 24px;
+    background: var(--primary-color);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: block;
+    margin-left: auto;
+}
+
+.comment-input-wrapper .btn-comment-submit:hover {
+    background: var(--primary-dark);
+}
+
+/* 모바일 반응형 */
+@media (max-width: 768px) {
+    .comment-section {
+        padding: 16px;
+        margin-top: 24px;
+    }
+
+    .comment-section-header h3 {
+        font-size: 16px;
+    }
+
+    .comment-item {
+        padding: 12px;
+    }
+
+    .comment-input-wrapper textarea {
+        min-height: 60px;
+        font-size: 13px;
+    }
+}
 
 /* 인쇄 스타일 */
 @media print {
