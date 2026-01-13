@@ -105,9 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (e.state.page === 'write') {
                 showWriteFormNoHistory();
             } else if (e.state.page === 'view' && e.state.postId) {
-                const post = state.posts.find(p => p.id === e.state.postId);
-                if (post) showViewPostNoHistory(post);
-                else showBoardListNoHistory();
+                // 🔒 뒤로가기 시에는 비밀번호 재입력 필요
+                showBoardListNoHistory();
             }
         } else {
             showBoardListNoHistory();
@@ -178,10 +177,13 @@ function setupEventListeners() {
 
 async function loadPosts() {
     try {
-        // password 필드 제외 - 보안 취약점 수정
-        const res = await supabase.fetch('posts?select=id,country,doc_number,data,attachments,created_at&order=created_at.desc');
+        // 🔒 password_hash 필드 완전 제외 - 절대 클라이언트로 전송 안됨
+        const res = await supabase.fetch('posts_public?select=*&order=created_at.desc');
         state.posts = await res.json() || [];
-    } catch (e) { state.posts = []; }
+    } catch (e) {
+        console.error('Failed to load posts:', e);
+        state.posts = [];
+    }
     renderPosts();
 }
 
@@ -190,7 +192,8 @@ function renderPosts() {
     const wrapper = document.querySelector('.board-table-wrapper');
     wrapper.innerHTML = state.posts.slice(start, end).map((post, i) => {
         const country = post.country ? `[${post.country}]` : '';
-        const author = state.isAdmin ? (post.data?.name || '익명') : '익명';
+        // 🔒 목록에서는 작성자 정보 완전 숨김 (data 필드가 없음)
+        const author = '익명';
         let dateText = '';
         if (post.created_at) {
             const d = new Date(post.created_at);
@@ -291,6 +294,8 @@ function showViewPost(post) {
     elements.writeForm.classList.add('hidden');
     elements.viewPost.classList.remove('hidden');
     state.currentPostId = post.id;
+    // 🔒 상세 정보를 state에 저장 (댓글에서 사용)
+    state.currentPostDetail = post;
     renderPostContent(post);
     loadComments(post.id);
     // 댓글 섹션 표시
@@ -309,6 +314,8 @@ function showViewPostNoHistory(post) {
     elements.writeForm.classList.add('hidden');
     elements.viewPost.classList.remove('hidden');
     state.currentPostId = post.id;
+    // 🔒 상세 정보를 state에 저장 (댓글에서 사용)
+    state.currentPostDetail = post;
     renderPostContent(post);
     loadComments(post.id);
     // 댓글 섹션 표시
@@ -333,28 +340,82 @@ function resetForm() {
     elements.submitBtn.disabled = false;
 }
 
-function handlePostClick(postId) {
+async function handlePostClick(postId) {
     state.currentPostId = postId;
-    const post = state.posts.find(p => p.id === postId);
-    if (!post) return;
-    state.isAdmin ? showViewPost(post) : showPasswordModal();
+
+    // 관리자는 비밀번호 없이 바로 조회
+    if (state.isAdmin) {
+        await loadPostDetail(postId, null);
+        return;
+    }
+
+    // 일반 사용자는 비밀번호 입력 모달 표시
+    showPasswordModal();
 }
 
-function showPasswordModal() { elements.passwordModal.classList.remove('hidden'); document.getElementById('modal-password').value = ''; document.getElementById('modal-password').focus(); }
-function hidePasswordModal() { elements.passwordModal.classList.add('hidden'); }
+function showPasswordModal() {
+    elements.passwordModal.classList.remove('hidden');
+    document.getElementById('modal-password').value = '';
+    document.getElementById('modal-password').focus();
+}
+
+function hidePasswordModal() {
+    elements.passwordModal.classList.add('hidden');
+}
+
 async function handlePasswordSubmit() {
     const pw = document.getElementById('modal-password').value;
-    const post = state.posts.find(p => p.id === state.currentPostId);
-    if (!post) { hidePasswordModal(); return; }
+    if (!pw) {
+        alert('비밀번호를 입력하세요.');
+        return;
+    }
 
-    // 서버사이드 비밀번호 검증
+    showLoading();
     try {
-        const isValid = await supabase.rpc('verify_post_password', { target_post_id: state.currentPostId, input_password: pw });
-        if (isValid) { hidePasswordModal(); showViewPost(post); }
-        else { alert('비밀번호가 일치하지 않습니다.'); document.getElementById('modal-password').value = ''; }
+        // 🔒 비밀번호 검증 후 상세 정보 가져오기
+        await loadPostDetail(state.currentPostId, pw);
+        hidePasswordModal();
+        hideLoading();
     } catch (e) {
+        hideLoading();
         console.error(e);
-        alert('오류가 발생했습니다.');
+        alert('비밀번호가 일치하지 않습니다.');
+        document.getElementById('modal-password').value = '';
+    }
+}
+
+// 🔒 비밀번호 검증 후 게시글 상세 정보 로드
+async function loadPostDetail(postId, password) {
+    try {
+        let postDetail;
+
+        if (state.isAdmin) {
+            // 관리자는 verify_admin_password로 인증 후 직접 조회
+            // 관리자 세션이 이미 검증되어 있으므로 직접 posts 테이블 조회
+            const res = await supabase.fetch(`posts?id=eq.${postId}&select=id,country,doc_number,data,attachments,created_at`);
+            const posts = await res.json();
+            if (!posts || posts.length === 0) {
+                throw new Error('게시글을 찾을 수 없습니다.');
+            }
+            postDetail = posts[0];
+        } else {
+            // 일반 사용자는 비밀번호 검증 함수 사용
+            const result = await supabase.rpc('get_post_detail', {
+                post_id: postId,
+                input_password: password
+            });
+
+            if (!result || result.length === 0) {
+                throw new Error('비밀번호가 일치하지 않습니다.');
+            }
+            postDetail = result[0];
+        }
+
+        // 상세 정보로 화면 표시
+        showViewPost(postDetail);
+    } catch (e) {
+        console.error('게시글 로드 실패:', e);
+        throw e;
     }
 }
 
@@ -445,26 +506,57 @@ async function handleDeleteConfirm() {
     } catch (err) { hideLoading(); alert('오류 발생'); console.error(err); }
 }
 
-function showEditModal() { elements.editModal.classList.remove('hidden'); document.getElementById('edit-password').value = ''; document.getElementById('edit-password').focus(); }
-function hideEditModal() { elements.editModal.classList.add('hidden'); }
+function showEditModal() {
+    elements.editModal.classList.remove('hidden');
+    document.getElementById('edit-password').value = '';
+    document.getElementById('edit-password').focus();
+}
+
+function hideEditModal() {
+    elements.editModal.classList.add('hidden');
+}
+
 async function handleEditConfirm() {
     const pw = document.getElementById('edit-password').value;
-    const post = state.posts.find(p => p.id === state.currentPostId);
-    if (!post) { hideEditModal(); return; }
+    if (!pw) {
+        alert('비밀번호를 입력하세요.');
+        return;
+    }
 
+    showLoading();
     try {
-        // 서버사이드 비밀번호 검증
-        const isValid = await supabase.rpc('verify_post_password', { target_post_id: state.currentPostId, input_password: pw });
-        if (isValid) {
-            hideEditModal();
-            state.isEditing = true;
-            state.editingPostId = state.currentPostId;
-            showEditForm(post);
+        // 🔒 비밀번호 검증 후 상세 정보 가져오기
+        let postDetail;
+
+        if (state.isAdmin) {
+            const res = await supabase.fetch(`posts?id=eq.${state.currentPostId}&select=id,country,doc_number,data,attachments,created_at`);
+            const posts = await res.json();
+            if (!posts || posts.length === 0) {
+                throw new Error('게시글을 찾을 수 없습니다.');
+            }
+            postDetail = posts[0];
         } else {
-            alert('비밀번호가 일치하지 않습니다.');
-            document.getElementById('edit-password').value = '';
+            const result = await supabase.rpc('get_post_detail', {
+                post_id: state.currentPostId,
+                input_password: pw
+            });
+
+            if (!result || result.length === 0) {
+                hideLoading();
+                alert('비밀번호가 일치하지 않습니다.');
+                document.getElementById('edit-password').value = '';
+                return;
+            }
+            postDetail = result[0];
         }
+
+        hideEditModal();
+        hideLoading();
+        state.isEditing = true;
+        state.editingPostId = state.currentPostId;
+        showEditForm(postDetail);
     } catch (e) {
+        hideLoading();
         console.error(e);
         alert('오류가 발생했습니다.');
     }
@@ -481,7 +573,9 @@ function showEditForm(post) {
         const kst = new Date(d.getTime() + (9 * 60 * 60 * 1000));
         return kst.toLocaleDateString('ko-KR');
     })() : getKSTDate();
-    document.getElementById('password').value = post.password;
+    // 🔒 비밀번호 필드는 비워둠 (해시를 클라이언트에 노출하지 않음)
+    document.getElementById('password').value = '';
+    document.getElementById('password').placeholder = '수정하려면 원래 비밀번호를 입력하세요';
     const d = post.data;
     ['position', 'country_city', 'name', 'illegal_reason', 'contact', 'illegal_period', 'current_address', 'korea_address', 'recommender_name', 'recommender_contact', 'recommender_org', 'recommender_email', 'recommender_address', 'local_life', 'health_status', 'return_plan', 'case_history', 'expert_opinion'].forEach(n => {
         const f = document.querySelector(`[name="${n}"]`); if (f) f.value = d[n] || '';
@@ -671,7 +765,14 @@ async function handleSubmit(e) {
                 alert('비밀번호가 일치하지 않습니다.');
             }
         } else {
-            await supabase.fetch('posts', { method: 'POST', body: JSON.stringify({ country, password: pw, doc_number: elements.docNumber.value, data, attachments: state.selectedFiles }) });
+            // 🔒 create_post RPC 함수를 사용하여 비밀번호 자동 해시화
+            const res = await supabase.rpc('create_post', {
+                p_country: country,
+                p_password: pw,
+                p_doc_number: elements.docNumber.value,
+                p_data: data,
+                p_attachments: state.selectedFiles
+            });
             alert('제출되었습니다.');
             hideLoading(); showBoardList();
         }
@@ -1003,8 +1104,8 @@ function renderComments(comments) {
         return;
     }
 
-    const currentPost = state.posts.find(p => p.id === state.currentPostId);
-    const currentAuthorName = currentPost?.data?.name || '익명';
+    // 🔒 현재 보고 있는 게시글의 작성자 이름 (상세 정보에서만 가져옴)
+    const currentAuthorName = state.currentPostDetail?.data?.name || '익명';
 
     const html = comments.map(comment => {
         const isAdmin = comment.is_admin;
@@ -1073,11 +1174,14 @@ async function handleCommentSubmit() {
         return;
     }
 
-    const post = state.posts.find(p => p.id === state.currentPostId);
-    if (!post) return;
+    if (!state.currentPostDetail) {
+        alert('게시글 정보를 불러올 수 없습니다.');
+        return;
+    }
 
     const isAdmin = state.isAdmin;
-    const authorName = isAdmin ? '관리자' : (post.data?.name || '익명');
+    // 🔒 상세 정보에서 작성자 이름 가져오기
+    const authorName = isAdmin ? '관리자' : (state.currentPostDetail.data?.name || '익명');
 
     try {
         showLoading();

@@ -29,17 +29,22 @@
    - Publish directory: `.`
 6. "Deploy site" 클릭
 
-## 관리자 비밀번호 변경
+## 🔒 보안 시스템
 
-`app.js` 파일에서 다음 부분을 수정하세요:
+이 프로젝트는 **bcrypt 해시화**를 사용하여 모든 비밀번호를 안전하게 보호합니다.
+- F12 개발자 도구로도 비밀번호를 절대 볼 수 없습니다
+- 모든 비밀번호 검증은 서버사이드에서만 실행됩니다
 
-```javascript
-const state = {
-    // ...
-    adminPassword: 'admin1234', // 이 부분을 원하는 비밀번호로 변경
-    // ...
-};
+### 관리자 비밀번호 변경
+
+Supabase SQL Editor에서 다음 명령을 실행하세요:
+
+```sql
+-- 관리자 비밀번호 변경
+SELECT change_admin_password('현재비밀번호', '새비밀번호');
 ```
+
+자세한 내용은 `SECURITY_UPGRADE_GUIDE.md`를 참고하세요.
 
 ## 파일 구조
 
