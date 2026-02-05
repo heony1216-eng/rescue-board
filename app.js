@@ -1,5 +1,6 @@
-// Supabase 설정은 config.js에서 로드됩니다.
-// SUPABASE_URL, SUPABASE_KEY는 config.js에 정의되어 있습니다.
+// Supabase 설정 (anon key - RLS로 보호됨)
+const SUPABASE_URL = 'https://duezqoujpeoooyzucgvy.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1ZXpxb3VqcGVvb295enVjZ3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NTk5NDgsImV4cCI6MjA4MzMzNTk0OH0.9cF2qa4HanWIjoNgqSs7PJELSDZny-vrS3n73t2ViDQ';
 
 // 상수
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
