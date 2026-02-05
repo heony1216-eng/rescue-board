@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://unpkg.com/html-docx-js/dist/html-docx.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/html-docx-js/dist/html-docx.js" integrity="sha384-TtrQp5nveof/QP1+f/OLiEHL3GuOIRyl3IfsGxu5X45VO2vHeT4HRNmQuTR3Ea3w" crossorigin="anonymous"></script>
 </head>
 <body>
     <div class="container">
@@ -75,8 +75,8 @@
             <form id="rescue-form" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="password">비밀번호 <span class="required">*</span></label>
-                    <input type="password" id="password" name="password" required>
-                    <small>다른 사람이 글을 볼 수 없도록 비밀번호를 설정하세요</small>
+                    <input type="password" id="password" name="password" required minlength="4">
+                    <small>다른 사람이 글을 볼 수 없도록 비밀번호를 설정하세요 (최소 4자)</small>
                 </div>
 
                 <div class="form-document">
@@ -371,6 +371,7 @@
         <p>처리 중...</p>
     </div>
 
+    <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

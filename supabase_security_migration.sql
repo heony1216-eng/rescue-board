@@ -72,12 +72,13 @@ BEGIN
   END IF;
 END $$;
 
--- 6. 관리자 초기 비밀번호 설정 (rnwh365kr을 해시화)
--- 기존 데이터가 있으면 업데이트, 없으면 삽입
+-- 6. 관리자 초기 비밀번호 설정
+-- ⚠️ 아래의 'CHANGE_ME_INITIAL_PASSWORD'를 반드시 원하는 비밀번호로 변경 후 실행하세요!
+-- 실행 후 이 SQL 파일에서 비밀번호를 삭제하세요.
 INSERT INTO admin (id, password_hash)
-VALUES (1, crypt('rnwh365kr', gen_salt('bf')))
+VALUES (1, crypt('CHANGE_ME_INITIAL_PASSWORD', gen_salt('bf')))
 ON CONFLICT (id) DO UPDATE
-SET password_hash = crypt('rnwh365kr', gen_salt('bf')),
+SET password_hash = crypt('CHANGE_ME_INITIAL_PASSWORD', gen_salt('bf')),
     updated_at = NOW();
 
 -- 7. 관리자 비밀번호 검증 함수 (해시 비교)
@@ -202,51 +203,66 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 13. RLS (Row Level Security) 설정
 ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 
--- 14. 정책 생성 - posts는 password_hash를 절대 반환하지 않음
+-- 14. admin 테이블 정책 - anon 사용자 직접 접근 완전 차단
+DROP POLICY IF EXISTS "admin_no_access" ON admin;
+CREATE POLICY "admin_no_access" ON admin
+  FOR ALL
+  USING (false);
+
+-- 15. posts 테이블 정책 - 직접 CRUD 차단 (SECURITY DEFINER 함수만 접근)
+-- SELECT: posts_public VIEW만 허용, posts 테이블 직접 조회 차단
 DROP POLICY IF EXISTS "posts_select_policy" ON posts;
 CREATE POLICY "posts_select_policy" ON posts
   FOR SELECT
-  USING (true);
+  USING (false);
 
+-- INSERT: 직접 삽입 차단 (create_post 함수만 사용)
 DROP POLICY IF EXISTS "posts_insert_policy" ON posts;
 CREATE POLICY "posts_insert_policy" ON posts
   FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (false);
 
+-- DELETE: 직접 삭제 차단 (delete_post 함수만 사용)
 DROP POLICY IF EXISTS "posts_delete_policy" ON posts;
 CREATE POLICY "posts_delete_policy" ON posts
   FOR DELETE
-  USING (true);
+  USING (false);
 
+-- UPDATE: 직접 수정 차단 (update_post 함수만 사용)
 DROP POLICY IF EXISTS "posts_update_policy" ON posts;
 CREATE POLICY "posts_update_policy" ON posts
   FOR UPDATE
-  USING (true);
+  USING (false);
 
--- 15. comments 테이블 정책
+-- 16. comments 테이블 정책
+-- SELECT: 댓글 조회 허용
 DROP POLICY IF EXISTS "comments_select_policy" ON comments;
 CREATE POLICY "comments_select_policy" ON comments
   FOR SELECT
   USING (true);
 
+-- INSERT: 댓글 작성은 create_comment 함수를 통해서만 (is_admin 위조 방지)
 DROP POLICY IF EXISTS "comments_insert_policy" ON comments;
 CREATE POLICY "comments_insert_policy" ON comments
   FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (false);
 
+-- DELETE: 직접 삭제 차단 (delete_comment 함수만 사용)
 DROP POLICY IF EXISTS "comments_delete_policy" ON comments;
 CREATE POLICY "comments_delete_policy" ON comments
   FOR DELETE
-  USING (true);
+  USING (false);
 
+-- UPDATE: 직접 수정 차단 (update_comment 함수만 사용)
 DROP POLICY IF EXISTS "comments_update_policy" ON comments;
 CREATE POLICY "comments_update_policy" ON comments
   FOR UPDATE
-  USING (true);
+  USING (false);
 
--- 16. posts 테이블에서 민감 정보 완전 차단을 위한 VIEW 생성
+-- 17. posts 테이블에서 민감 정보 완전 차단을 위한 VIEW 생성
 -- 목록에서는 id, country, created_at만 노출
 CREATE OR REPLACE VIEW posts_public AS
 SELECT
@@ -255,7 +271,10 @@ SELECT
   created_at
 FROM posts;
 
--- 17. 비밀번호 검증 후 게시글 상세 정보를 가져오는 함수
+-- posts_public VIEW에 대한 SELECT 권한 부여
+GRANT SELECT ON posts_public TO anon, authenticated;
+
+-- 18. 비밀번호 검증 후 게시글 상세 정보를 가져오는 함수
 CREATE OR REPLACE FUNCTION get_post_detail(
   post_id UUID,
   input_password TEXT
@@ -271,11 +290,9 @@ RETURNS TABLE(
 BEGIN
   -- 비밀번호 검증
   IF NOT verify_post_password(post_id, input_password) THEN
-    -- 비밀번호가 틀리면 빈 결과 반환
     RETURN;
   END IF;
 
-  -- 비밀번호가 맞으면 상세 정보 반환
   RETURN QUERY
   SELECT
     p.id,
@@ -289,12 +306,145 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- 19. 관리자 전용 게시글 상세 조회 함수 (관리자 비밀번호 필수)
+CREATE OR REPLACE FUNCTION get_post_detail_admin(
+  post_id UUID,
+  admin_password TEXT
+)
+RETURNS TABLE(
+  id UUID,
+  country TEXT,
+  doc_number TEXT,
+  data JSONB,
+  attachments JSONB,
+  created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  IF NOT verify_admin_password(admin_password) THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    p.id,
+    p.country,
+    p.doc_number,
+    p.data,
+    p.attachments,
+    p.created_at
+  FROM posts p
+  WHERE p.id = post_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 20. 관리자 전용 전체 게시글 조회 함수 (CSV 다운로드용)
+CREATE OR REPLACE FUNCTION get_all_posts_admin(admin_password TEXT)
+RETURNS TABLE(
+  id UUID,
+  country TEXT,
+  doc_number TEXT,
+  data JSONB,
+  created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  IF NOT verify_admin_password(admin_password) THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT p.id, p.country, p.doc_number, p.data, p.created_at
+  FROM posts p
+  ORDER BY p.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 21. 댓글 작성 함수 (is_admin 서버 측 검증)
+CREATE OR REPLACE FUNCTION create_comment(
+  p_post_id UUID,
+  p_content TEXT,
+  p_author_name TEXT,
+  p_admin_password TEXT DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+  new_comment_id UUID;
+  is_admin_user BOOLEAN := FALSE;
+BEGIN
+  -- 관리자 비밀번호가 제공되면 검증
+  IF p_admin_password IS NOT NULL AND p_admin_password != '' THEN
+    is_admin_user := verify_admin_password(p_admin_password);
+  END IF;
+
+  INSERT INTO comments (post_id, content, author_name, is_admin)
+  VALUES (p_post_id, p_content, CASE WHEN is_admin_user THEN '관리자' ELSE p_author_name END, is_admin_user)
+  RETURNING id INTO new_comment_id;
+
+  RETURN new_comment_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 22. 댓글 수정 함수 (권한 검증)
+CREATE OR REPLACE FUNCTION update_comment(
+  p_comment_id UUID,
+  p_content TEXT,
+  p_author_name TEXT,
+  p_admin_password TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+  comment_record RECORD;
+  is_admin_user BOOLEAN := FALSE;
+BEGIN
+  SELECT * INTO comment_record FROM comments WHERE id = p_comment_id;
+  IF NOT FOUND THEN RETURN FALSE; END IF;
+
+  IF p_admin_password IS NOT NULL AND p_admin_password != '' THEN
+    is_admin_user := verify_admin_password(p_admin_password);
+  END IF;
+
+  -- 관리자이거나, 본인 댓글(관리자 댓글이 아니고 작성자명 일치)인 경우만 수정 허용
+  IF is_admin_user OR (NOT comment_record.is_admin AND comment_record.author_name = p_author_name) THEN
+    UPDATE comments SET content = p_content WHERE id = p_comment_id;
+    RETURN TRUE;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 23. 댓글 삭제 함수 (권한 검증)
+CREATE OR REPLACE FUNCTION delete_comment(
+  p_comment_id UUID,
+  p_author_name TEXT,
+  p_admin_password TEXT DEFAULT NULL
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+  comment_record RECORD;
+  is_admin_user BOOLEAN := FALSE;
+BEGIN
+  SELECT * INTO comment_record FROM comments WHERE id = p_comment_id;
+  IF NOT FOUND THEN RETURN FALSE; END IF;
+
+  IF p_admin_password IS NOT NULL AND p_admin_password != '' THEN
+    is_admin_user := verify_admin_password(p_admin_password);
+  END IF;
+
+  IF is_admin_user OR (NOT comment_record.is_admin AND comment_record.author_name = p_author_name) THEN
+    DELETE FROM comments WHERE id = p_comment_id;
+    RETURN TRUE;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- =====================================================
 -- 마이그레이션 완료!
 -- =====================================================
 -- 이제 다음을 실행하세요:
--- SELECT * FROM admin; -- 관리자 정보 확인 (해시만 보임)
+-- SELECT * FROM admin; -- RLS로 차단됨 (직접 접근 불가)
 --
--- 관리자 비밀번호 변경:
--- SELECT change_admin_password('rnwh365kr', '새비밀번호');
+-- 관리자 비밀번호 변경 (초기 설정 후 반드시 변경하세요):
+-- SELECT change_admin_password('현재비밀번호', '새비밀번호');
 -- =====================================================

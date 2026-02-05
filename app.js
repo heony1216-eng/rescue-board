@@ -1,6 +1,5 @@
-// Supabase 설정
-const SUPABASE_URL = 'https://duezqoujpeoooyzucgvy.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1ZXpxb3VqcGVvb295enVjZ3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NTk5NDgsImV4cCI6MjA4MzMzNTk0OH0.9cF2qa4HanWIjoNgqSs7PJELSDZny-vrS3n73t2ViDQ';
+// Supabase 설정은 config.js에서 로드됩니다.
+// SUPABASE_URL, SUPABASE_KEY는 config.js에 정의되어 있습니다.
 
 // 상수
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -37,7 +36,7 @@ const supabase = {
     }
 };
 
-const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, selectedFiles: [], currentPostId: null, isEditing: false, editingPostId: null, uploadProgress: 0, currentPostDetail: null };
+const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, selectedFiles: [], currentPostId: null, isEditing: false, editingPostId: null, uploadProgress: 0, currentPostDetail: null };
 let elements = {};
 
 function initElements() {
@@ -86,10 +85,24 @@ function initElements() {
     };
 }
 
-// 에러 표시 유틸리티
-function showError(msg) {
-    alert(msg);
+// 토스트 알림 유틸리티
+function showToast(msg, type = 'error') {
+    const existing = document.querySelector('.toast-notification');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
+
+function showError(msg) { showToast(msg, 'error'); }
+function showSuccess(msg) { showToast(msg, 'success'); }
 
 document.addEventListener('DOMContentLoaded', () => {
     initElements();
@@ -103,12 +116,20 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.commentSection.classList.add('hidden');
     }
 
-    // 관리자 상태 복원 (sessionStorage 기반)
-    if (sessionStorage.getItem('isAdmin') === 'true') {
-        state.isAdmin = true;
-        elements.adminBtn.textContent = '관리자 로그아웃';
-        elements.adminBtn.classList.add('logged-in');
-        elements.csvBtn.classList.remove('hidden');
+    // 관리자 상태 복원 (sessionStorage 기반 - 서버 재검증)
+    const savedAdminPw = sessionStorage.getItem('adminAuth');
+    if (savedAdminPw) {
+        supabase.rpc('verify_admin_password', { input_password: savedAdminPw }).then(isValid => {
+            if (isValid) {
+                state.isAdmin = true;
+                state.adminPassword = savedAdminPw;
+                elements.adminBtn.textContent = '관리자 로그아웃';
+                elements.adminBtn.classList.add('logged-in');
+                elements.csvBtn.classList.remove('hidden');
+            } else {
+                sessionStorage.removeItem('adminAuth');
+            }
+        });
     }
 
     window.addEventListener('popstate', (e) => {
@@ -401,24 +422,46 @@ async function loadPostDetail(postId, password) {
     try {
         let postDetail;
 
-        if (state.isAdmin) {
-            const res = await supabase.fetch(`posts?id=eq.${postId}&select=id,country,doc_number,data,attachments,created_at`);
-            if (!res.ok) throw new Error('게시글 조회 실패');
-            const posts = await res.json();
-            if (!posts || posts.length === 0) {
-                throw new Error('게시글을 찾을 수 없습니다.');
+        if (state.isAdmin && state.adminPassword) {
+            // 관리자: RPC 함수 시도 → REST API fallback
+            const rpcResult = await supabase.rpc('get_post_detail_admin', {
+                post_id: postId,
+                admin_password: state.adminPassword
+            });
+
+            if (Array.isArray(rpcResult) && rpcResult.length > 0) {
+                postDetail = rpcResult[0];
+            } else {
+                // RPC 미존재 또는 에러 → 관리자 비밀번호로 get_post_detail 시도
+                const rpcResult2 = await supabase.rpc('get_post_detail', {
+                    post_id: postId,
+                    input_password: state.adminPassword
+                });
+
+                if (Array.isArray(rpcResult2) && rpcResult2.length > 0) {
+                    postDetail = rpcResult2[0];
+                } else {
+                    // 최종 fallback: REST API 직접 조회
+                    const res = await supabase.fetch(`posts?id=eq.${postId}&select=id,country,doc_number,data,attachments,created_at`);
+                    if (res.ok) {
+                        const posts = await res.json();
+                        if (posts && posts.length > 0) postDetail = posts[0];
+                    }
+                }
             }
-            postDetail = posts[0];
+
+            if (!postDetail) throw new Error('게시글을 찾을 수 없습니다.');
         } else {
             const result = await supabase.rpc('get_post_detail', {
                 post_id: postId,
                 input_password: password
             });
 
-            if (!result || result.length === 0) {
+            if (Array.isArray(result) && result.length > 0) {
+                postDetail = result[0];
+            } else {
                 throw new Error('비밀번호가 일치하지 않습니다.');
             }
-            postDetail = result[0];
         }
 
         showViewPost(postDetail, true);
@@ -431,12 +474,13 @@ async function loadPostDetail(postId, password) {
 function showAdminModal() {
     if (state.isAdmin) {
         state.isAdmin = false;
-        sessionStorage.removeItem('isAdmin');
+        state.adminPassword = null;
+        sessionStorage.removeItem('adminAuth');
         elements.adminBtn.textContent = '관리자 로그인';
         elements.adminBtn.classList.remove('logged-in');
         elements.csvBtn.classList.add('hidden');
         renderPosts();
-        showError('로그아웃 되었습니다.');
+        showSuccess('로그아웃 되었습니다.');
         return;
     }
     elements.adminModal.classList.remove('hidden');
@@ -459,14 +503,15 @@ async function handleAdminLogin() {
 
         if (isValid) {
             state.isAdmin = true;
-            sessionStorage.setItem('isAdmin', 'true');
+            state.adminPassword = pw;
+            sessionStorage.setItem('adminAuth', pw);
 
             elements.adminBtn.textContent = '관리자 로그아웃';
             elements.adminBtn.classList.add('logged-in');
             elements.csvBtn.classList.remove('hidden');
             hideAdminModal();
             renderPosts();
-            showError('관리자로 로그인되었습니다.');
+            showSuccess('관리자로 로그인되었습니다.');
         } else {
             showError('비밀번호가 일치하지 않습니다.');
             document.getElementById('admin-password').value = '';
@@ -491,7 +536,7 @@ async function handleDeleteConfirm() {
         });
         hideDeleteModal(); hideLoading();
         if (result === true) {
-            showError('삭제되었습니다.');
+            showSuccess('삭제되었습니다.');
             showBoardList(true);
         } else {
             showError('비밀번호가 일치하지 않습니다.');
@@ -520,27 +565,44 @@ async function handleEditConfirm() {
     try {
         let postDetail;
 
-        if (state.isAdmin) {
-            const res = await supabase.fetch(`posts?id=eq.${state.currentPostId}&select=id,country,doc_number,data,attachments,created_at`);
-            if (!res.ok) throw new Error('게시글 조회 실패');
-            const posts = await res.json();
-            if (!posts || posts.length === 0) {
-                throw new Error('게시글을 찾을 수 없습니다.');
+        if (state.isAdmin && state.adminPassword) {
+            // 관리자: RPC → REST fallback (loadPostDetail과 동일 로직)
+            const rpcResult = await supabase.rpc('get_post_detail_admin', {
+                post_id: state.currentPostId,
+                admin_password: state.adminPassword
+            });
+            if (Array.isArray(rpcResult) && rpcResult.length > 0) {
+                postDetail = rpcResult[0];
+            } else {
+                const rpcResult2 = await supabase.rpc('get_post_detail', {
+                    post_id: state.currentPostId,
+                    input_password: state.adminPassword
+                });
+                if (Array.isArray(rpcResult2) && rpcResult2.length > 0) {
+                    postDetail = rpcResult2[0];
+                } else {
+                    const res = await supabase.fetch(`posts?id=eq.${state.currentPostId}&select=id,country,doc_number,data,attachments,created_at`);
+                    if (res.ok) {
+                        const posts = await res.json();
+                        if (posts && posts.length > 0) postDetail = posts[0];
+                    }
+                }
             }
-            postDetail = posts[0];
         } else {
             const result = await supabase.rpc('get_post_detail', {
                 post_id: state.currentPostId,
                 input_password: pw
             });
-
-            if (!result || result.length === 0) {
-                hideLoading();
-                showError('비밀번호가 일치하지 않습니다.');
-                document.getElementById('edit-password').value = '';
-                return;
+            if (Array.isArray(result) && result.length > 0) {
+                postDetail = result[0];
             }
-            postDetail = result[0];
+        }
+
+        if (!postDetail) {
+            hideLoading();
+            showError('비밀번호가 일치하지 않습니다.');
+            document.getElementById('edit-password').value = '';
+            return;
         }
 
         hideEditModal();
@@ -692,7 +754,7 @@ async function uploadWithProgress(file, path) {
 function renderFilePreview() {
     elements.filePreview.innerHTML = state.selectedFiles.map((file, i) => {
         const isImg = file.type?.startsWith('image/');
-        const src = file.url || file.data;
+        const src = sanitizeUrl(file.url) || file.data;
         return `<div class="file-item">${isImg ? `<img src="${src}" alt="${escapeHtml(file.name)}">` : `<div class="file-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>`}<div class="file-name">${escapeHtml(file.name)}</div><button type="button" class="remove-file" data-file-index="${i}">×</button></div>`;
     }).join('');
 
@@ -711,6 +773,7 @@ async function handleSubmit(e) {
     const fd = new FormData(e.target);
     const country = fd.get('country_city'), pw = fd.get('password');
     if (!country || !pw) { showError('국가/도시와 비밀번호는 필수입니다.'); return; }
+    if (!state.isEditing && pw.length < 4) { showError('비밀번호는 최소 4자 이상이어야 합니다.'); return; }
     showLoading();
     // 가족 데이터 수집
     const families = [];
@@ -742,7 +805,7 @@ async function handleSubmit(e) {
             });
             if (result === true) {
                 state.isEditing = false; state.editingPostId = null;
-                showError('수정되었습니다.');
+                showSuccess('수정되었습니다.');
                 hideLoading(); showBoardList(true);
             } else {
                 hideLoading();
@@ -756,7 +819,7 @@ async function handleSubmit(e) {
                 p_data: data,
                 p_attachments: state.selectedFiles
             });
-            showError('제출되었습니다.');
+            showSuccess('제출되었습니다.');
             hideLoading(); showBoardList(true);
         }
     } catch (err) { hideLoading(); showError('오류가 발생했습니다.'); console.error(err); }
@@ -791,15 +854,18 @@ function renderPostContent(post) {
     const attHtml = post.attachments?.length ? `
         <h2 class="section-title">첨부파일</h2>
         <div class="attachments-grid">
-            ${post.attachments.map(f => `
+            ${post.attachments.map(f => {
+                const safeUrl = sanitizeUrl(f.url);
+                if (!safeUrl) return '';
+                return `
                 <div class="attachment-item">
-                    ${f.type?.startsWith('image/') ? `<img src="${f.url}" alt="">` : `<div class="file-icon" style="height:140px;display:flex;align-items:center;justify-content:center;background:#f2f2f2"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>`}
+                    ${f.type?.startsWith('image/') ? `<img src="${safeUrl}" alt="">` : `<div class="file-icon" style="height:140px;display:flex;align-items:center;justify-content:center;background:#f2f2f2"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></div>`}
                     <div class="attachment-info">
                         <span class="attachment-name">${escapeHtml(f.name)}</span>
-                        <a href="${f.url}" target="_blank" class="download-btn">다운로드</a>
+                        <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="download-btn">다운로드</a>
                     </div>
                 </div>
-            `).join('')}
+            `}).join('')}
         </div>
     ` : '';
 
@@ -999,13 +1065,17 @@ function generateWord() {
 }
 
 function downloadCSV() {
-    if (!state.isAdmin) { showError('관리자만 CSV를 다운로드할 수 있습니다.'); return; }
-    // 관리자용: 전체 posts를 서버에서 가져와서 CSV 생성
+    if (!state.isAdmin || !state.adminPassword) { showError('관리자만 CSV를 다운로드할 수 있습니다.'); return; }
+    // 관리자용: 서버 측 검증 RPC를 통해 전체 posts 조회 (없으면 직접 조회 fallback)
     showLoading();
-    supabase.fetch('posts?select=id,country,doc_number,data,created_at&order=created_at.desc')
-        .then(res => {
-            if (!res.ok) throw new Error('데이터 조회 실패');
-            return res.json();
+    supabase.rpc('get_all_posts_admin', { admin_password: state.adminPassword })
+        .then(result => {
+            // RPC 함수 미존재 시 fallback
+            if (!Array.isArray(result)) {
+                return supabase.fetch('posts?select=id,country,doc_number,data,created_at&order=created_at.desc')
+                    .then(res => res.ok ? res.json() : []);
+            }
+            return result;
         })
         .then(posts => {
             hideLoading();
@@ -1027,6 +1097,14 @@ function downloadCSV() {
 }
 
 function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+function sanitizeUrl(url) {
+    if (!url) return '';
+    try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+        return encodeURI(decodeURI(url)).replace(/"/g, '%22').replace(/'/g, '%27');
+    } catch { return ''; }
+}
 function showLoading() { elements.loadingOverlay.classList.remove('hidden'); }
 function hideLoading() { elements.loadingOverlay.classList.add('hidden'); }
 
@@ -1167,20 +1245,36 @@ async function handleCommentSubmit() {
 
     try {
         showLoading();
-        const res = await supabase.fetch('comments', {
-            method: 'POST',
-            body: JSON.stringify({
-                post_id: state.currentPostId,
-                content: content,
-                author_name: authorName,
-                is_admin: isAdmin
-            })
-        });
+        let success = false;
 
-        if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.message || '댓글 등록 실패');
+        // create_comment RPC 시도, 없으면 REST API fallback
+        try {
+            const result = await supabase.rpc('create_comment', {
+                p_post_id: state.currentPostId,
+                p_content: content,
+                p_author_name: authorName,
+                p_admin_password: isAdmin ? state.adminPassword : null
+            });
+            // RPC가 UUID 문자열을 반환하면 성공, 에러 객체면 fallback
+            if (result && !result.code) {
+                success = true;
+            } else {
+                throw new Error('RPC not available');
+            }
+        } catch {
+            const res = await supabase.fetch('comments', {
+                method: 'POST',
+                body: JSON.stringify({
+                    post_id: state.currentPostId,
+                    content: content,
+                    author_name: authorName,
+                    is_admin: isAdmin
+                })
+            });
+            success = res.ok;
         }
+
+        if (!success) throw new Error('댓글 등록 실패');
 
         elements.commentInput.value = '';
         await loadComments(state.currentPostId);
@@ -1247,20 +1341,30 @@ async function saveEditComment(commentId, newContent, commentItem) {
         return;
     }
 
+    const authorName = state.isAdmin ? '관리자' : (state.currentPostDetail?.data?.name || '익명');
+
     try {
         showLoading();
-        const res = await supabase.fetch(`comments?id=eq.${commentId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({
-                content: trimmedContent
-            })
-        });
+        let success = false;
 
-        if (!res.ok) {
-            const error = await res.json();
-            console.error('댓글 수정 응답 오류:', error);
-            throw new Error(error.message || '댓글 수정 실패');
+        try {
+            const result = await supabase.rpc('update_comment', {
+                p_comment_id: commentId,
+                p_content: trimmedContent,
+                p_author_name: authorName,
+                p_admin_password: state.isAdmin ? state.adminPassword : null
+            });
+            if (result && result.code) throw new Error('RPC not available');
+            success = (result === true);
+        } catch {
+            const res = await supabase.fetch(`comments?id=eq.${commentId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ content: trimmedContent })
+            });
+            success = res.ok;
         }
+
+        if (!success) throw new Error('댓글 수정 권한이 없습니다.');
 
         await loadComments(state.currentPostId);
         hideLoading();
@@ -1276,17 +1380,28 @@ async function handleDeleteComment(commentId) {
         return;
     }
 
+    const authorName = state.isAdmin ? '관리자' : (state.currentPostDetail?.data?.name || '익명');
+
     try {
         showLoading();
-        const res = await supabase.fetch(`comments?id=eq.${commentId}`, {
-            method: 'DELETE'
-        });
+        let success = false;
 
-        if (!res.ok) {
-            const error = await res.json();
-            console.error('댓글 삭제 응답 오류:', error);
-            throw new Error(error.message || '댓글 삭제 실패');
+        try {
+            const result = await supabase.rpc('delete_comment', {
+                p_comment_id: commentId,
+                p_author_name: authorName,
+                p_admin_password: state.isAdmin ? state.adminPassword : null
+            });
+            if (result && result.code) throw new Error('RPC not available');
+            success = (result === true);
+        } catch {
+            const res = await supabase.fetch(`comments?id=eq.${commentId}`, {
+                method: 'DELETE'
+            });
+            success = res.ok;
         }
+
+        if (!success) throw new Error('댓글 삭제 권한이 없습니다.');
 
         await loadComments(state.currentPostId);
         hideLoading();

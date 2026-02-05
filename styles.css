@@ -670,3 +670,33 @@ body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-seri
     .attachment-item img { height: 100px; }
     @page { size: A4; margin: 15mm; }
 }
+
+/* 토스트 알림 */
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10000;
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    max-width: 90vw;
+    text-align: center;
+}
+.toast-notification.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+.toast-error {
+    background: #ff4757;
+    color: white;
+}
+.toast-success {
+    background: #2ed573;
+    color: white;
+}

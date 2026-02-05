@@ -18,9 +18,11 @@ CREATE TABLE admin (
 -- 3. pgcrypto extension 활성화
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- 4. 관리자 초기 비밀번호 설정 (rnwh365kr)
+-- 4. 관리자 초기 비밀번호 설정
+-- ⚠️ 아래의 'CHANGE_ME_INITIAL_PASSWORD'를 반드시 원하는 비밀번호로 변경 후 실행하세요!
+-- 실행 후 이 SQL 파일에서 비밀번호를 삭제하세요.
 INSERT INTO admin (id, password_hash)
-VALUES (1, crypt('rnwh365kr', gen_salt('bf')));
+VALUES (1, crypt('CHANGE_ME_INITIAL_PASSWORD', gen_salt('bf')));
 
 -- 5. posts 테이블 구조 확인 및 수정
 DO $$
@@ -217,7 +219,7 @@ FROM posts;
 DO $$
 BEGIN
   RAISE NOTICE '✅ 테이블 생성 완료!';
-  RAISE NOTICE '✅ 관리자 초기 비밀번호: rnwh365kr';
+  RAISE NOTICE '✅ 관리자 초기 비밀번호가 설정되었습니다. 반드시 변경하세요!';
   RAISE NOTICE '✅ 모든 함수 생성 완료!';
 END $$;
 
@@ -227,7 +229,7 @@ END $$;
 -- 이제 다음을 테스트하세요:
 --
 -- 1. 관리자 로그인 테스트:
--- SELECT verify_admin_password('rnwh365kr');
+-- SELECT verify_admin_password('설정한비밀번호');
 -- → true가 나와야 함
 --
 -- 2. 관리자 정보 확인:
@@ -235,5 +237,5 @@ END $$;
 -- → password_hash만 보여야 함 (평문 비밀번호 없음)
 --
 -- 3. 관리자 비밀번호 변경:
--- SELECT change_admin_password('rnwh365kr', '새비밀번호');
+-- SELECT change_admin_password('현재비밀번호', '새비밀번호');
 -- =====================================================
