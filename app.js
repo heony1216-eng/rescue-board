@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function startKSTClock() {
     const update = () => {
         const now = new Date().toLocaleString('ko-KR', { ...KST_LOCALE_OPTIONS, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-        elements.kstClock.textContent = now;
+        elements.kstClock.textContent = '대한민국 ' + now;
     };
     update();
     setInterval(update, 1000);
@@ -235,28 +235,51 @@ function renderPosts() {
     const start = (state.currentPage - 1) * state.postsPerPage, end = start + state.postsPerPage;
     const wrapper = document.querySelector('.board-table-wrapper');
     wrapper.innerHTML = state.posts.slice(start, end).map((post, i) => {
-        const country = post.country ? `[${post.country}]` : '';
-        const author = '익명';
+        const country = post.country || '';
         const dateText = formatKSTDate(post.created_at);
+        const countryBadge = country ? `<span class="country-badge">${escapeHtml(country)}</span>` : '';
         return `
             <div class="post-card" data-id="${post.id}">
-                <div class="post-card-header">
-                    <span class="post-card-number">No.${state.posts.length - start - i}</span>
-                    <span class="post-card-date">${dateText}</span>
+                <div class="post-card-body">
+                    <div class="post-card-title">
+                        <svg class="lock-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        구조요청
+                        ${countryBadge}
+                    </div>
+                    <div class="post-card-meta">
+                        <span class="post-card-number">No.${state.posts.length - start - i}</span>
+                        <span class="post-card-dot"></span>
+                        <span class="post-card-date">${dateText}</span>
+                    </div>
                 </div>
-                <div class="post-card-title">
-                    <svg class="lock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="11" width="18" height="11" rx="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                    </svg>
-                    ${country} 구조요청
-                </div>
-                <div class="post-card-author">${escapeHtml(author)}</div>
             </div>
         `;
     }).join('');
     wrapper.querySelectorAll('.post-card').forEach(card => card.addEventListener('click', () => handlePostClick(card.dataset.id)));
     renderPagination();
+    updateStats();
+}
+
+function updateStats() {
+    const totalEl = document.getElementById('stat-total');
+    const todayEl = document.getElementById('stat-today');
+    const countriesEl = document.getElementById('stat-countries');
+    if (!totalEl) return;
+
+    totalEl.textContent = state.posts.length;
+
+    const todayStr = getKSTDate();
+    const todayCount = state.posts.filter(p => {
+        const d = new Date(p.created_at).toLocaleString('ko-KR', { ...KST_LOCALE_OPTIONS, year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '');
+        return d === todayStr;
+    }).length;
+    todayEl.textContent = todayCount;
+
+    const countries = new Set(state.posts.map(p => p.country).filter(Boolean));
+    countriesEl.textContent = countries.size;
 }
 
 function renderPagination() {

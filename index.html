@@ -14,18 +14,39 @@
 <body>
     <div class="container">
         <header class="header">
-            <h1>한인구조단 구조 요청</h1>
-            <div id="kst-clock" class="kst-clock"></div>
+            <div class="header-top">
+                <div class="header-brand">
+                    <h1>한인구조단</h1>
+                    <span class="header-subtitle">구조 요청 게시판</span>
+                </div>
+                <div class="header-actions">
+                    <div id="kst-clock" class="kst-clock"></div>
+                    <button id="admin-btn" class="btn-header-admin">관리자</button>
+                    <button id="csv-download-btn" class="btn-header-csv hidden">CSV</button>
+                </div>
+            </div>
+            <div class="header-stats">
+                <div class="stat-item">
+                    <span class="stat-number" id="stat-total">0</span>
+                    <span class="stat-label">전체 요청</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <span class="stat-number" id="stat-today">0</span>
+                    <span class="stat-label">오늘 등록</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <span class="stat-number" id="stat-countries">0</span>
+                    <span class="stat-label">국가</span>
+                </div>
+            </div>
         </header>
 
         <!-- 게시판 목록 -->
         <main id="board-list" class="board-section">
             <div class="board-header">
-                <h2 class="board-title">구조 요청 게시판</h2>
-                <div class="admin-login">
-                    <button id="admin-btn" class="btn btn-admin">관리자 로그인</button>
-                    <button id="csv-download-btn" class="btn btn-csv hidden">CSV 다운로드</button>
-                </div>
+                <h2 class="board-title">전체 요청</h2>
             </div>
             <div class="board-table-wrapper">
                 <table class="board-table">
@@ -42,7 +63,6 @@
             </div>
             <div class="board-footer">
                 <div class="pagination" id="pagination"></div>
-                <button id="write-btn" class="btn btn-write">글쓰기</button>
             </div>
         </main>
 
@@ -287,6 +307,14 @@
     <!-- 다크모드 토글 버튼 -->
     <button class="theme-toggle" id="theme-toggle" aria-label="다크모드 토글">
         🌙
+    </button>
+
+    <!-- 글쓰기 FAB 버튼 -->
+    <button class="fab-write" id="write-btn" aria-label="글쓰기">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14M5 12h14"/>
+        </svg>
+        <span>글쓰기</span>
     </button>
 
     <!-- 모달들 -->
