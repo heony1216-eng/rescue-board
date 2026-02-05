@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>한인구조단 구조 요청</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://unpkg.com/html-docx-js/dist/html-docx.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>한인구조단 구조 요청</h1>
+            <div id="kst-clock" class="kst-clock"></div>
+        </header>
+
+        <!-- 게시판 목록 -->
+        <main id="board-list" class="board-section">
+            <div class="board-header">
+                <h2 class="board-title">구조 요청 게시판</h2>
+                <div class="admin-login">
+                    <button id="admin-btn" class="btn btn-admin">관리자 로그인</button>
+                    <button id="csv-download-btn" class="btn btn-csv hidden">CSV 다운로드</button>
+                </div>
+            </div>
+            <div class="board-table-wrapper">
+                <table class="board-table">
+                    <thead>
+                        <tr>
+                            <th class="col-no">No</th>
+                            <th class="col-title">제목</th>
+                            <th class="col-author">글쓴이</th>
+                            <th class="col-date">작성시간</th>
+                        </tr>
+                    </thead>
+                    <tbody id="post-list"></tbody>
+                </table>
+            </div>
+            <div class="board-footer">
+                <div class="pagination" id="pagination"></div>
+                <button id="write-btn" class="btn btn-write">글쓰기</button>
+            </div>
+        </main>
+
+        <!-- 글쓰기 폼 -->
+        <section id="write-form" class="form-section hidden">
+            <div class="form-header">
+                <h2>구조 요청 신청서 작성</h2>
+                <button id="back-to-list" class="btn btn-back">← 목록으로</button>
+            </div>
+            <form id="rescue-form" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="password">비밀번호 <span class="required">*</span></label>
+                    <input type="password" id="password" name="password" required>
+                    <small>다른 사람이 글을 볼 수 없도록 비밀번호를 설정하세요</small>
+                </div>
+
+                <div class="form-document">
+                    <div class="doc-header">
+                        <table class="info-table">
+                            <tr>
+                                <td class="label-cell">문서번호</td>
+                                <td class="value-cell"><input type="text" id="doc-number" name="doc_number" class="form-input"></td>
+                            </tr>
+                        </table>
+                        <h1 class="doc-title">Intake Report (구조 요청 신청서)</h1>
+                        <table class="info-table">
+                            <tr>
+                                <td class="label-cell">담당/직책</td>
+                                <td class="value-cell"><input type="text" name="position" class="form-input"></td>
+                                <td class="label-cell">작성일</td>
+                                <td class="value-cell" id="write-date"></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <h2 class="section-title">1. 구조 대상자 개요</h2>
+                    <p class="required-notice">* 부분은 꼭 작성 부탁드립니다.</p>
+
+                    <!-- 인적사항 -->
+                    <div class="table-section">
+                        <h3 class="table-section-title"><span class="required">* 인적사항</span></h3>
+                        <div class="section-label-header"><span class="required">* 인적사항</span></div>
+                        <table class="data-table no-header">
+                            <tr>
+                                <td class="label-cell">국가/도시</td>
+                                <td colspan="3"><input type="text" name="country_city" class="form-input" required></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">이름</td>
+                                <td><input type="text" name="name" class="form-input" required></td>
+                                <td class="label-cell">불법체류사유</td>
+                                <td><input type="text" name="illegal_reason" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">연락처</td>
+                                <td><input type="text" name="contact" class="form-input" required></td>
+                                <td class="label-cell">불법체류기간</td>
+                                <td><input type="text" name="illegal_period" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">현재주소</td>
+                                <td colspan="3"><input type="text" name="current_address" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">한국 주소</td>
+                                <td colspan="3"><input type="text" name="korea_address" class="form-input"></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- 추천인 -->
+                    <div class="table-section">
+                        <h3 class="table-section-title"><span class="required">* 추천인</span></h3>
+                        <div class="section-label-header"><span class="required">* 추천인</span></div>
+                        <table class="data-table no-header">
+                            <tr>
+                                <td class="label-cell">성명</td>
+                                <td><input type="text" name="recommender_name" class="form-input"></td>
+                                <td class="label-cell">연락처</td>
+                                <td><input type="text" name="recommender_contact" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">소속 기관</td>
+                                <td><input type="text" name="recommender_org" class="form-input"></td>
+                                <td class="label-cell">이메일</td>
+                                <td><input type="email" name="recommender_email" class="form-input"></td>
+                            </tr>
+                            <tr>
+                                <td class="label-cell">기관 주소</td>
+                                <td colspan="3"><input type="text" name="recommender_address" class="form-input"></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- 가족사항 (동적) -->
+                    <h2 class="section-title"><span class="required">* 가족사항</span></h2>
+                    <div class="dynamic-section">
+                        <div class="section-label-header mobile-only"><span class="required">* 가족사항</span></div>
+                        <table class="data-table family-table" id="family-table">
+                            <thead>
+                                <tr>
+                                    <th class="label-cell">성명</th>
+                                    <th class="label-cell">관계</th>
+                                    <th class="label-cell">나이</th>
+                                    <th class="label-cell">연락처</th>
+                                </tr>
+                            </thead>
+                            <tbody id="family-rows">
+                                <tr>
+                                    <td data-label="성명"><input type="text" name="family_name[]" class="form-input"></td>
+                                    <td data-label="관계"><input type="text" name="family_relation[]" class="form-input"></td>
+                                    <td data-label="나이"><input type="text" name="family_age[]" class="form-input"></td>
+                                    <td data-label="연락처"><input type="text" name="family_contact[]" class="form-input"></td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4" class="detail-row">
+                                        <div class="detail-label">상세내용</div>
+                                        <textarea name="family_detail[]" class="form-textarea family-detail"></textarea>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div class="row-actions">
+                            <button type="button" class="btn-add" data-action="add-family-row">+</button>
+                            <button type="button" class="btn-remove" data-action="remove-last-family-row">-</button>
+                        </div>
+                    </div>
+
+                    <!-- 구조 예산안 (동적) -->
+                    <h2 class="section-title">구조 예산안</h2>
+                    <div class="dynamic-section">
+                        <div class="budget-table-header mobile-only">구조 예산안</div>
+                        <table class="data-table budget-table" id="budget-table">
+                            <thead>
+                                <tr>
+                                    <th class="label-cell">세부항목</th>
+                                    <th class="label-cell">산출근거</th>
+                                    <th class="label-cell">금액</th>
+                                </tr>
+                            </thead>
+                            <tbody id="budget-rows">
+                                <tr>
+                                    <td data-label="세부항목"><input type="text" name="budget_item[]" class="form-input"></td>
+                                    <td data-label="산출근거"><input type="text" name="budget_basis[]" class="form-input"></td>
+                                    <td data-label="금액"><input type="text" name="budget_amount[]" class="form-input"></td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="2" class="label-cell">합계</td>
+                                    <td><input type="text" id="budget-total" name="budget_total" class="form-input" readonly></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div class="row-actions">
+                            <button type="button" class="btn-add" data-action="add-budget-row">+</button>
+                            <button type="button" class="btn-remove" data-action="remove-last-budget-row">-</button>
+                        </div>
+                    </div>
+
+                    <h2 class="section-title section-divider">2. 세부사항</h2>
+
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title"><span class="required">* 현지 생활 현황</span></span></div>
+                        <textarea name="local_life" class="form-textarea"></textarea>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title"><span class="required">* 건강상태</span></span></div>
+                        <textarea name="health_status" class="form-textarea"></textarea>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title"><span class="required">* 귀국 후 계획</span></span></div>
+                        <textarea name="return_plan" class="form-textarea"></textarea>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title"><span class="required">* 사례 접수 경위</span></span></div>
+                        <textarea name="case_history" class="form-textarea"></textarea>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-header"><span class="detail-title">전문가 의견</span></div>
+                        <textarea name="expert_opinion" class="form-textarea"></textarea>
+                    </div>
+
+                    <!-- 파일 업로드 -->
+                    <h2 class="section-title">첨부파일 <span style="font-weight:400;font-size:13px;color:#666;">- 여권, 신분증 사진 (있으신 분들은 첨부파일로 꼭 올려주세요)</span></h2>
+                    <div class="file-upload-area compact">
+                        <div class="upload-zone" id="upload-zone">
+                            <input type="file" id="file-input" multiple accept="image/*,.pdf,.doc,.docx">
+                            <div class="upload-placeholder">
+                                <span>파일을 드래그하거나 클릭하여 업로드 (최대 10MB)</span>
+                            </div>
+                        </div>
+                        <div class="upload-progress hidden" id="upload-progress">
+                            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+                            <span class="progress-text" id="progress-text">0%</span>
+                        </div>
+                        <div class="file-preview-grid" id="file-preview"></div>
+                    </div>
+                </div>
+
+                <div class="form-actions no-print">
+                    <button type="button" id="cancel-btn" class="btn btn-cancel">취소</button>
+                    <button type="submit" id="submit-btn" class="btn btn-submit">등록</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- 게시글 보기 -->
+        <section id="view-post" class="form-section hidden">
+            <div class="form-header no-print">
+                <h2>구조 요청 신청서</h2>
+                <button id="back-to-list-view" class="btn btn-back">← 목록으로</button>
+            </div>
+            <div class="post-actions no-print">
+                <button id="edit-post-btn" class="btn btn-edit">수정</button>
+                <button id="delete-post-btn" class="btn btn-delete">삭제</button>
+                <button id="print-post-btn" class="btn btn-print">인쇄</button>
+                <button id="pdf-post-btn" class="btn btn-pdf hidden">PDF 저장</button>
+                <button id="word-post-btn" class="btn btn-word hidden">워드 저장</button>
+            </div>
+            <div id="post-content"></div>
+
+            <!-- 댓글 섹션 -->
+            <div class="comment-section no-print hidden" id="comment-section">
+                <div class="comment-section-header">
+                    <h3>댓글</h3>
+                    <span class="comment-count" id="comment-count">0</span>
+                </div>
+                <div class="comment-list" id="comment-list">
+                    <div class="comment-empty">첫 댓글을 남겨보세요.</div>
+                </div>
+                <div class="comment-input-wrapper">
+                    <textarea id="comment-input" placeholder="댓글을 입력하세요..." rows="3"></textarea>
+                    <button id="comment-submit" class="btn btn-comment-submit">댓글 등록</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 다크모드 토글 버튼 -->
+    <button class="theme-toggle" id="theme-toggle" aria-label="다크모드 토글">
+        🌙
+    </button>
+
+    <!-- 모달들 -->
+    <div id="password-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>비밀번호 확인</h3>
+            <p>게시글 비밀번호를 입력하세요.</p>
+            <input type="password" id="modal-password">
+            <div class="modal-actions">
+                <button id="modal-cancel" class="btn btn-cancel">취소</button>
+                <button id="modal-submit" class="btn btn-submit">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="admin-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>관리자 로그인</h3>
+            <p>관리자 비밀번호를 입력하세요.</p>
+            <input type="password" id="admin-password">
+            <div class="modal-actions">
+                <button id="admin-cancel" class="btn btn-cancel">취소</button>
+                <button id="admin-submit" class="btn btn-submit">로그인</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>게시글 삭제</h3>
+            <p>비밀번호를 입력하세요.</p>
+            <input type="password" id="delete-password">
+            <div class="modal-actions">
+                <button id="delete-cancel" class="btn btn-cancel">취소</button>
+                <button id="delete-confirm" class="btn btn-delete">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>게시글 수정</h3>
+            <p>비밀번호를 입력하세요.</p>
+            <input type="password" id="edit-password">
+            <div class="modal-actions">
+                <button id="edit-cancel" class="btn btn-cancel">취소</button>
+                <button id="edit-confirm" class="btn btn-submit">수정</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p>처리 중...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

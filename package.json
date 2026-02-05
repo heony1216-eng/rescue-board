@@ -1,0 +1,14 @@
+{
+  "name": "rescue-board",
+  "version": "1.0.0",
+  "description": "Rescue Request Board with Maximum Security",
+  "main": "app.js",
+  "scripts": {
+    "obfuscate": "javascript-obfuscator app.js --output app.obfuscated.js --compact true --control-flow-flattening true --control-flow-flattening-threshold 0.75 --dead-code-injection true --dead-code-injection-threshold 0.4 --debug-protection true --debug-protection-interval 2000 --disable-console-output true --identifier-names-generator hexadecimal --log false --renaming true --renaming-safe true --self-defending true --string-array true --string-array-encoding rc4 --string-array-threshold 0.75 --transform-object-keys true --unicode-escape-sequence false"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "javascript-obfuscator": "^5.1.0"
+  }
+}

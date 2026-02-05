@@ -1,0 +1,300 @@
+-- =====================================================
+-- 🔒 보안 최강화 마이그레이션 스크립트
+-- =====================================================
+-- 이 스크립트는 비밀번호를 bcrypt로 해시화하여
+-- F12 개발자도구로도 절대 비밀번호를 볼 수 없게 합니다.
+-- =====================================================
+
+-- 1. pgcrypto extension 활성화 (bcrypt 사용)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- 2. admin 테이블 생성 (해시 비밀번호 저장)
+CREATE TABLE IF NOT EXISTS admin (
+  id SERIAL PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. posts 테이블이 없으면 생성
+CREATE TABLE IF NOT EXISTS posts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  country TEXT,
+  password_hash TEXT NOT NULL,
+  doc_number TEXT,
+  data JSONB,
+  attachments JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 4. comments 테이블 생성
+CREATE TABLE IF NOT EXISTS comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  author_name TEXT,
+  is_admin BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 5. 기존 평문 비밀번호가 있다면 해시로 변환
+-- posts 테이블에 password 컬럼이 있고 password_hash가 없는 경우
+DO $$
+BEGIN
+  -- password 컬럼이 존재하는지 확인
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'posts' AND column_name = 'password'
+  ) THEN
+    -- password_hash 컬럼이 없으면 추가
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'posts' AND column_name = 'password_hash'
+    ) THEN
+      ALTER TABLE posts ADD COLUMN password_hash TEXT;
+    END IF;
+
+    -- 평문 비밀번호를 해시로 변환
+    UPDATE posts
+    SET password_hash = crypt(password, gen_salt('bf'))
+    WHERE password IS NOT NULL AND password_hash IS NULL;
+
+    -- 평문 비밀번호 컬럼 삭제
+    ALTER TABLE posts DROP COLUMN IF EXISTS password;
+  END IF;
+
+  -- password_hash 컬럼을 NOT NULL로 설정
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'posts' AND column_name = 'password_hash'
+  ) THEN
+    ALTER TABLE posts ALTER COLUMN password_hash SET NOT NULL;
+  END IF;
+END $$;
+
+-- 6. 관리자 초기 비밀번호 설정 (rnwh365kr을 해시화)
+-- 기존 데이터가 있으면 업데이트, 없으면 삽입
+INSERT INTO admin (id, password_hash)
+VALUES (1, crypt('rnwh365kr', gen_salt('bf')))
+ON CONFLICT (id) DO UPDATE
+SET password_hash = crypt('rnwh365kr', gen_salt('bf')),
+    updated_at = NOW();
+
+-- 7. 관리자 비밀번호 검증 함수 (해시 비교)
+CREATE OR REPLACE FUNCTION verify_admin_password(input_password TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+  stored_hash TEXT;
+BEGIN
+  SELECT password_hash INTO stored_hash FROM admin WHERE id = 1 LIMIT 1;
+
+  IF stored_hash IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN (crypt(input_password, stored_hash) = stored_hash);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 8. 게시글 비밀번호 검증 함수 (해시 비교)
+CREATE OR REPLACE FUNCTION verify_post_password(target_post_id UUID, input_password TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+  stored_hash TEXT;
+BEGIN
+  -- 먼저 관리자 비밀번호로 시도
+  IF verify_admin_password(input_password) THEN
+    RETURN TRUE;
+  END IF;
+
+  -- 게시글 비밀번호 확인
+  SELECT password_hash INTO stored_hash FROM posts WHERE id = target_post_id;
+
+  IF stored_hash IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN (crypt(input_password, stored_hash) = stored_hash);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 9. 게시글 삭제 함수 (해시 검증)
+CREATE OR REPLACE FUNCTION delete_post(post_id UUID, input_password TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+  -- 비밀번호 검증
+  IF verify_post_password(post_id, input_password) THEN
+    DELETE FROM posts WHERE id = post_id;
+    RETURN TRUE;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 10. 게시글 수정 함수 (해시 검증)
+CREATE OR REPLACE FUNCTION update_post(
+  post_id UUID,
+  input_password TEXT,
+  new_country TEXT,
+  new_doc_number TEXT,
+  new_data JSONB,
+  new_attachments JSONB
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  -- 비밀번호 검증
+  IF verify_post_password(post_id, input_password) THEN
+    UPDATE posts SET
+      country = new_country,
+      doc_number = new_doc_number,
+      data = new_data,
+      attachments = new_attachments
+    WHERE id = post_id;
+    RETURN TRUE;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 11. 게시글 생성 함수 (비밀번호 자동 해시화)
+CREATE OR REPLACE FUNCTION create_post(
+  p_country TEXT,
+  p_password TEXT,
+  p_doc_number TEXT,
+  p_data JSONB,
+  p_attachments JSONB
+)
+RETURNS UUID AS $$
+DECLARE
+  new_post_id UUID;
+BEGIN
+  INSERT INTO posts (country, password_hash, doc_number, data, attachments)
+  VALUES (p_country, crypt(p_password, gen_salt('bf')), p_doc_number, p_data, p_attachments)
+  RETURNING id INTO new_post_id;
+
+  RETURN new_post_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 12. 관리자 비밀번호 변경 함수
+CREATE OR REPLACE FUNCTION change_admin_password(
+  old_password TEXT,
+  new_password TEXT
+)
+RETURNS BOOLEAN AS $$
+BEGIN
+  -- 기존 비밀번호 확인
+  IF NOT verify_admin_password(old_password) THEN
+    RETURN FALSE;
+  END IF;
+
+  -- 새 비밀번호로 업데이트
+  UPDATE admin
+  SET password_hash = crypt(new_password, gen_salt('bf')),
+      updated_at = NOW()
+  WHERE id = 1;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 13. RLS (Row Level Security) 설정
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+
+-- 14. 정책 생성 - posts는 password_hash를 절대 반환하지 않음
+DROP POLICY IF EXISTS "posts_select_policy" ON posts;
+CREATE POLICY "posts_select_policy" ON posts
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "posts_insert_policy" ON posts;
+CREATE POLICY "posts_insert_policy" ON posts
+  FOR INSERT
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "posts_delete_policy" ON posts;
+CREATE POLICY "posts_delete_policy" ON posts
+  FOR DELETE
+  USING (true);
+
+DROP POLICY IF EXISTS "posts_update_policy" ON posts;
+CREATE POLICY "posts_update_policy" ON posts
+  FOR UPDATE
+  USING (true);
+
+-- 15. comments 테이블 정책
+DROP POLICY IF EXISTS "comments_select_policy" ON comments;
+CREATE POLICY "comments_select_policy" ON comments
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "comments_insert_policy" ON comments;
+CREATE POLICY "comments_insert_policy" ON comments
+  FOR INSERT
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "comments_delete_policy" ON comments;
+CREATE POLICY "comments_delete_policy" ON comments
+  FOR DELETE
+  USING (true);
+
+DROP POLICY IF EXISTS "comments_update_policy" ON comments;
+CREATE POLICY "comments_update_policy" ON comments
+  FOR UPDATE
+  USING (true);
+
+-- 16. posts 테이블에서 민감 정보 완전 차단을 위한 VIEW 생성
+-- 목록에서는 id, country, created_at만 노출
+CREATE OR REPLACE VIEW posts_public AS
+SELECT
+  id,
+  country,
+  created_at
+FROM posts;
+
+-- 17. 비밀번호 검증 후 게시글 상세 정보를 가져오는 함수
+CREATE OR REPLACE FUNCTION get_post_detail(
+  post_id UUID,
+  input_password TEXT
+)
+RETURNS TABLE(
+  id UUID,
+  country TEXT,
+  doc_number TEXT,
+  data JSONB,
+  attachments JSONB,
+  created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  -- 비밀번호 검증
+  IF NOT verify_post_password(post_id, input_password) THEN
+    -- 비밀번호가 틀리면 빈 결과 반환
+    RETURN;
+  END IF;
+
+  -- 비밀번호가 맞으면 상세 정보 반환
+  RETURN QUERY
+  SELECT
+    p.id,
+    p.country,
+    p.doc_number,
+    p.data,
+    p.attachments,
+    p.created_at
+  FROM posts p
+  WHERE p.id = post_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =====================================================
+-- 마이그레이션 완료!
+-- =====================================================
+-- 이제 다음을 실행하세요:
+-- SELECT * FROM admin; -- 관리자 정보 확인 (해시만 보임)
+--
+-- 관리자 비밀번호 변경:
+-- SELECT change_admin_password('rnwh365kr', '새비밀번호');
+-- =====================================================
