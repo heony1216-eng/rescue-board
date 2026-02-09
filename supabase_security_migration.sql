@@ -365,12 +365,11 @@ CREATE OR REPLACE FUNCTION create_comment(
   p_author_name TEXT,
   p_admin_password TEXT DEFAULT NULL
 )
-RETURNS UUID AS $$
+RETURNS BIGINT AS $$
 DECLARE
-  new_comment_id UUID;
+  new_comment_id BIGINT;
   is_admin_user BOOLEAN := FALSE;
 BEGIN
-  -- 관리자 비밀번호가 제공되면 검증
   IF p_admin_password IS NOT NULL AND p_admin_password != '' THEN
     is_admin_user := verify_admin_password(p_admin_password);
   END IF;
@@ -385,7 +384,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 22. 댓글 수정 함수 (권한 검증)
 CREATE OR REPLACE FUNCTION update_comment(
-  p_comment_id UUID,
+  p_comment_id BIGINT,
   p_content TEXT,
   p_author_name TEXT,
   p_admin_password TEXT DEFAULT NULL
@@ -402,7 +401,6 @@ BEGIN
     is_admin_user := verify_admin_password(p_admin_password);
   END IF;
 
-  -- 관리자이거나, 본인 댓글(관리자 댓글이 아니고 작성자명 일치)인 경우만 수정 허용
   IF is_admin_user OR (NOT comment_record.is_admin AND comment_record.author_name = p_author_name) THEN
     UPDATE comments SET content = p_content WHERE id = p_comment_id;
     RETURN TRUE;
@@ -414,7 +412,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 23. 댓글 삭제 함수 (권한 검증)
 CREATE OR REPLACE FUNCTION delete_comment(
-  p_comment_id UUID,
+  p_comment_id BIGINT,
   p_author_name TEXT,
   p_admin_password TEXT DEFAULT NULL
 )
@@ -445,7 +443,7 @@ CREATE OR REPLACE FUNCTION get_comments(
   p_password TEXT
 )
 RETURNS TABLE(
-  id UUID,
+  id BIGINT,
   post_id UUID,
   content TEXT,
   author_name TEXT,
@@ -466,19 +464,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 25. 관리자용 댓글 수 조회 함수 (게시글 목록에 댓글 수 표시)
-CREATE OR REPLACE FUNCTION get_comment_counts_admin(
-  admin_password TEXT
-)
+-- 25. 공개 댓글 수 조회 함수 (게시글 목록에 댓글 수 표시, 비밀번호 불필요)
+CREATE OR REPLACE FUNCTION get_comment_counts()
 RETURNS TABLE(
   post_id UUID,
   comment_count BIGINT
 ) AS $$
 BEGIN
-  IF NOT verify_admin_password(admin_password) THEN
-    RETURN;
-  END IF;
-
   RETURN QUERY
   SELECT c.post_id, COUNT(*)::BIGINT AS comment_count
   FROM comments c
