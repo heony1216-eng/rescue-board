@@ -466,6 +466,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- 25. 관리자용 댓글 수 조회 함수 (게시글 목록에 댓글 수 표시)
+CREATE OR REPLACE FUNCTION get_comment_counts_admin(
+  admin_password TEXT
+)
+RETURNS TABLE(
+  post_id UUID,
+  comment_count BIGINT
+) AS $$
+BEGIN
+  IF NOT verify_admin_password(admin_password) THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT c.post_id, COUNT(*)::BIGINT AS comment_count
+  FROM comments c
+  GROUP BY c.post_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- =====================================================
 -- 마이그레이션 완료!
 -- =====================================================

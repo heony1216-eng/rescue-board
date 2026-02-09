@@ -206,6 +206,7 @@ body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-seri
 .post-card-number { font-size: 12px; font-weight: 500; color: var(--text-muted); }
 .post-card-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-muted); opacity: 0.5; }
 .post-card-date { font-size: 12px; color: var(--text-muted); }
+.post-card-comments { font-size: 11px; font-weight: 600; color: #fff; background: var(--primary-color); padding: 1px 6px; border-radius: 8px; }
 
 .empty-state { text-align: center; padding: 80px 20px; color: var(--text-muted); }
 .empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }

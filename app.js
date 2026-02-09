@@ -37,7 +37,7 @@ const supabase = {
     }
 };
 
-const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, adminToken: null, selectedFiles: [], currentPostId: null, currentPostPassword: null, isEditing: false, editingPostId: null, uploadProgress: 0, currentPostDetail: null };
+const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, adminToken: null, selectedFiles: [], currentPostId: null, currentPostPassword: null, isEditing: false, editingPostId: null, uploadProgress: 0, currentPostDetail: null, commentCounts: {} };
 
 // 관리자 세션 토큰 생성 (비밀번호 대신 랜덤 토큰 저장)
 function generateSessionToken() {
@@ -291,6 +291,15 @@ async function loadPosts() {
         console.error('Failed to load posts:', e);
         state.posts = [];
     }
+    state.commentCounts = {};
+    if (state.isAdmin && state.adminPassword) {
+        try {
+            const counts = await supabase.rpc('get_comment_counts_admin', { admin_password: state.adminPassword });
+            if (Array.isArray(counts)) {
+                counts.forEach(r => { state.commentCounts[r.post_id] = r.comment_count; });
+            }
+        } catch (e) { console.error('댓글 수 로드 실패:', e); }
+    }
     renderPosts();
 }
 
@@ -316,6 +325,7 @@ function renderPosts() {
                         <span class="post-card-number">No.${state.posts.length - start - i}</span>
                         <span class="post-card-dot"></span>
                         <span class="post-card-date">${dateText}</span>
+                        ${state.isAdmin && state.commentCounts[post.id] ? `<span class="post-card-dot"></span><span class="post-card-comments"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> ${state.commentCounts[post.id]}</span>` : ''}
                     </div>
                 </div>
             </div>
