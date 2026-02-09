@@ -37,7 +37,47 @@ const supabase = {
     }
 };
 
-const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, selectedFiles: [], currentPostId: null, isEditing: false, editingPostId: null, uploadProgress: 0, currentPostDetail: null };
+const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, adminToken: null, selectedFiles: [], currentPostId: null, isEditing: false, editingPostId: null, uploadProgress: 0, currentPostDetail: null };
+
+// 관리자 세션 토큰 생성 (비밀번호 대신 랜덤 토큰 저장)
+function generateSessionToken() {
+    const arr = new Uint8Array(32);
+    crypto.getRandomValues(arr);
+    return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 비밀번호 시도 횟수 제한 (rate limiting)
+const rateLimiter = {
+    attempts: [],
+    maxAttempts: 5,
+    windowMs: 60000, // 1분
+    lockoutMs: 300000, // 5분 잠금
+    lockedUntil: 0,
+    check() {
+        const now = Date.now();
+        if (now < this.lockedUntil) {
+            const remaining = Math.ceil((this.lockedUntil - now) / 1000);
+            showError(`너무 많은 시도가 감지되었습니다. ${remaining}초 후에 다시 시도해주세요.`);
+            return false;
+        }
+        // 윈도우 내 시도 횟수 계산
+        this.attempts = this.attempts.filter(t => now - t < this.windowMs);
+        if (this.attempts.length >= this.maxAttempts) {
+            this.lockedUntil = now + this.lockoutMs;
+            this.attempts = [];
+            showError('비밀번호 시도 횟수를 초과했습니다. 5분 후에 다시 시도해주세요.');
+            return false;
+        }
+        return true;
+    },
+    record() {
+        this.attempts.push(Date.now());
+    },
+    reset() {
+        this.attempts = [];
+        this.lockedUntil = 0;
+    }
+};
 let elements = {};
 
 function initElements() {
@@ -117,20 +157,17 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.commentSection.classList.add('hidden');
     }
 
-    // 관리자 상태 복원 (sessionStorage 기반 - 서버 재검증)
-    const savedAdminPw = sessionStorage.getItem('adminAuth');
-    if (savedAdminPw) {
-        supabase.rpc('verify_admin_password', { input_password: savedAdminPw }).then(isValid => {
-            if (isValid) {
-                state.isAdmin = true;
-                state.adminPassword = savedAdminPw;
-                elements.adminBtn.textContent = '관리자 로그아웃';
-                elements.adminBtn.classList.add('logged-in');
-                elements.csvBtn.classList.remove('hidden');
-            } else {
-                sessionStorage.removeItem('adminAuth');
-            }
-        });
+    // 관리자 상태 복원 (세션 토큰 기반 - 비밀번호는 저장하지 않음)
+    const savedToken = sessionStorage.getItem('adminToken');
+    const savedPwHash = sessionStorage.getItem('adminPwHash');
+    if (savedToken && savedPwHash) {
+        // 토큰이 존재하면 관리자 상태만 복원 (비밀번호 재입력 필요 시 로그아웃)
+        state.isAdmin = true;
+        state.adminToken = savedToken;
+        state.adminPassword = null; // 비밀번호는 메모리에 보관하지 않음
+        elements.adminBtn.textContent = '관리자 로그아웃';
+        elements.adminBtn.classList.add('logged-in');
+        elements.csvBtn.classList.remove('hidden');
     }
 
     window.addEventListener('popstate', (e) => {
@@ -381,9 +418,21 @@ function resetForm() {
 async function handlePostClick(postId) {
     state.currentPostId = postId;
 
-    if (state.isAdmin) {
+    if (state.isAdmin && state.adminPassword) {
         await loadPostDetail(postId, null);
         return;
+    }
+
+    // 관리자이지만 비밀번호가 메모리에 없는 경우(세션 복원) → 재로그인 요청
+    if (state.isAdmin && !state.adminPassword) {
+        showError('세션이 만료되었습니다. 다시 로그인해주세요.');
+        state.isAdmin = false;
+        state.adminToken = null;
+        sessionStorage.removeItem('adminToken');
+        sessionStorage.removeItem('adminPwHash');
+        elements.adminBtn.textContent = '관리자 로그인';
+        elements.adminBtn.classList.remove('logged-in');
+        elements.csvBtn.classList.add('hidden');
     }
 
     showPasswordModal();
@@ -406,13 +455,17 @@ async function handlePasswordSubmit() {
         return;
     }
 
+    if (!rateLimiter.check()) return;
+
     showLoading();
     try {
         await loadPostDetail(state.currentPostId, pw);
+        rateLimiter.reset();
         hidePasswordModal();
         hideLoading();
     } catch (e) {
         hideLoading();
+        rateLimiter.record();
         console.error(e);
         showError('비밀번호가 일치하지 않습니다.');
         document.getElementById('modal-password').value = '';
@@ -420,6 +473,7 @@ async function handlePasswordSubmit() {
 }
 
 async function loadPostDetail(postId, password) {
+    if (!isValidUUID(postId)) { showError('잘못된 게시글 ID입니다.'); return; }
     try {
         let postDetail;
 
@@ -476,7 +530,9 @@ function showAdminModal() {
     if (state.isAdmin) {
         state.isAdmin = false;
         state.adminPassword = null;
-        sessionStorage.removeItem('adminAuth');
+        state.adminToken = null;
+        sessionStorage.removeItem('adminToken');
+        sessionStorage.removeItem('adminPwHash');
         elements.adminBtn.textContent = '관리자 로그인';
         elements.adminBtn.classList.remove('logged-in');
         elements.csvBtn.classList.add('hidden');
@@ -499,13 +555,18 @@ async function handleAdminLogin() {
         return;
     }
 
+    if (!rateLimiter.check()) return;
+
     try {
         const isValid = await supabase.rpc('verify_admin_password', { input_password: pw });
 
         if (isValid) {
             state.isAdmin = true;
-            state.adminPassword = pw;
-            sessionStorage.setItem('adminAuth', pw);
+            state.adminPassword = pw; // 현재 세션에서만 메모리에 보관
+            rateLimiter.reset();
+            state.adminToken = generateSessionToken();
+            sessionStorage.setItem('adminToken', state.adminToken);
+            sessionStorage.setItem('adminPwHash', 'verified'); // 비밀번호 자체는 저장하지 않음
 
             elements.adminBtn.textContent = '관리자 로그아웃';
             elements.adminBtn.classList.add('logged-in');
@@ -514,6 +575,7 @@ async function handleAdminLogin() {
             renderPosts();
             showSuccess('관리자로 로그인되었습니다.');
         } else {
+            rateLimiter.record();
             showError('비밀번호가 일치하지 않습니다.');
             document.getElementById('admin-password').value = '';
         }
@@ -529,6 +591,8 @@ function hideDeleteModal() { elements.deleteModal.classList.add('hidden'); }
 async function handleDeleteConfirm() {
     const pw = document.getElementById('delete-password').value;
     if (!pw) { showError('비밀번호를 입력하세요.'); return; }
+    if (!isValidUUID(state.currentPostId)) { showError('잘못된 게시글 ID입니다.'); return; }
+    if (!rateLimiter.check()) return;
     showLoading();
     try {
         const result = await supabase.rpc('delete_post', {
@@ -537,9 +601,11 @@ async function handleDeleteConfirm() {
         });
         hideDeleteModal(); hideLoading();
         if (result === true) {
+            rateLimiter.reset();
             showSuccess('삭제되었습니다.');
             showBoardList(true);
         } else {
+            rateLimiter.record();
             showError('비밀번호가 일치하지 않습니다.');
         }
     } catch (err) { hideLoading(); showError('오류가 발생했습니다.'); console.error(err); }
@@ -690,9 +756,36 @@ function calcBudgetTotal() {
     elements.budgetTotal.value = total ? total.toLocaleString() : '';
 }
 
+// 허용된 파일 타입 (화이트리스트)
+const ALLOWED_FILE_TYPES = {
+    'image/jpeg': ['.jpg', '.jpeg'],
+    'image/png': ['.png'],
+    'image/gif': ['.gif'],
+    'image/webp': ['.webp'],
+    'application/pdf': ['.pdf'],
+    'application/msword': ['.doc'],
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+    'application/vnd.ms-excel': ['.xls'],
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+    'text/plain': ['.txt']
+};
+const ALLOWED_EXTENSIONS = Object.values(ALLOWED_FILE_TYPES).flat();
+
+function isAllowedFile(file) {
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    const mimeAllowed = ALLOWED_FILE_TYPES.hasOwnProperty(file.type);
+    const extAllowed = ALLOWED_EXTENSIONS.includes(ext);
+    // MIME과 확장자 모두 허용 목록에 있어야 함
+    return mimeAllowed && extAllowed;
+}
+
 // 파일 처리
 async function processFiles(files) {
     for (const file of files) {
+        if (!isAllowedFile(file)) {
+            showError(`${file.name}: 허용되지 않는 파일 형식입니다. (이미지, PDF, 문서 파일만 가능)`);
+            continue;
+        }
         if (file.size > MAX_FILE_SIZE) { showError(`${file.name}: 10MB 초과`); continue; }
         let processedFile = file;
         if (file.type.startsWith('image/')) {
@@ -1098,6 +1191,7 @@ function downloadCSV() {
 }
 
 function escapeHtml(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+function isValidUUID(str) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str); }
 function sanitizeUrl(url) {
     if (!url) return '';
     try {
@@ -1146,6 +1240,7 @@ function updateThemeIcon(theme) {
 
 // 댓글 기능
 async function loadComments(postId) {
+    if (!isValidUUID(postId)) return;
     try {
         const res = await supabase.fetch(`comments?post_id=eq.${postId}&select=*&order=created_at.asc`);
         if (!res.ok) throw new Error('댓글 로드 실패');
@@ -1236,7 +1331,7 @@ async function handleCommentSubmit() {
         return;
     }
 
-    if (!state.currentPostDetail) {
+    if (!state.currentPostDetail || !isValidUUID(state.currentPostId)) {
         showError('게시글 정보를 불러올 수 없습니다.');
         return;
     }
@@ -1263,13 +1358,17 @@ async function handleCommentSubmit() {
                 throw new Error('RPC not available');
             }
         } catch {
+            // fallback: is_admin은 항상 false로 강제 (클라이언트 조작 방지)
+            if (isAdmin) {
+                throw new Error('관리자 댓글은 RPC 함수를 통해서만 작성할 수 있습니다.');
+            }
             const res = await supabase.fetch('comments', {
                 method: 'POST',
                 body: JSON.stringify({
                     post_id: state.currentPostId,
                     content: content,
                     author_name: authorName,
-                    is_admin: isAdmin
+                    is_admin: false
                 })
             });
             success = res.ok;
@@ -1358,6 +1457,11 @@ async function saveEditComment(commentId, newContent, commentItem) {
             if (result && result.code) throw new Error('RPC not available');
             success = (result === true);
         } catch {
+            // fallback: 관리자 수정은 RPC를 통해서만 허용
+            if (state.isAdmin) {
+                throw new Error('관리자 댓글 수정은 RPC 함수를 통해서만 가능합니다.');
+            }
+            if (!isValidUUID(commentId)) throw new Error('잘못된 댓글 ID');
             const res = await supabase.fetch(`comments?id=eq.${commentId}`, {
                 method: 'PATCH',
                 body: JSON.stringify({ content: trimmedContent })
@@ -1396,6 +1500,11 @@ async function handleDeleteComment(commentId) {
             if (result && result.code) throw new Error('RPC not available');
             success = (result === true);
         } catch {
+            // fallback: 관리자 삭제는 RPC를 통해서만 허용
+            if (state.isAdmin) {
+                throw new Error('관리자 댓글 삭제는 RPC 함수를 통해서만 가능합니다.');
+            }
+            if (!isValidUUID(commentId)) throw new Error('잘못된 댓글 ID');
             const res = await supabase.fetch(`comments?id=eq.${commentId}`, {
                 method: 'DELETE'
             });
