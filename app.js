@@ -157,17 +157,21 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.commentSection.classList.add('hidden');
     }
 
-    // 관리자 상태 복원 (세션 토큰 기반 - 비밀번호는 저장하지 않음)
-    const savedToken = sessionStorage.getItem('adminToken');
-    const savedPwHash = sessionStorage.getItem('adminPwHash');
-    if (savedToken && savedPwHash) {
-        // 토큰이 존재하면 관리자 상태만 복원 (비밀번호 재입력 필요 시 로그아웃)
-        state.isAdmin = true;
-        state.adminToken = savedToken;
-        state.adminPassword = null; // 비밀번호는 메모리에 보관하지 않음
-        elements.adminBtn.textContent = '관리자 로그아웃';
-        elements.adminBtn.classList.add('logged-in');
-        elements.csvBtn.classList.remove('hidden');
+    // 관리자 상태 복원 (sessionStorage + 서버 재검증)
+    const savedPw = sessionStorage.getItem('_ast');
+    if (savedPw) {
+        supabase.rpc('verify_admin_password', { input_password: savedPw }).then(isValid => {
+            if (isValid) {
+                state.isAdmin = true;
+                state.adminPassword = savedPw;
+                state.adminToken = generateSessionToken();
+                elements.adminBtn.textContent = '관리자 로그아웃';
+                elements.adminBtn.classList.add('logged-in');
+                elements.csvBtn.classList.remove('hidden');
+            } else {
+                sessionStorage.removeItem('_ast');
+            }
+        });
     }
 
     window.addEventListener('popstate', (e) => {
@@ -423,13 +427,12 @@ async function handlePostClick(postId) {
         return;
     }
 
-    // 관리자이지만 비밀번호가 메모리에 없는 경우(세션 복원) → 재로그인 요청
+    // 관리자이지만 비밀번호가 메모리에 없는 경우 → 재로그인 요청
     if (state.isAdmin && !state.adminPassword) {
-        showError('세션이 만료되었습니다. 다시 로그인해주세요.');
+        showError('관리자 인증이 필요합니다. 다시 로그인해주세요.');
         state.isAdmin = false;
         state.adminToken = null;
-        sessionStorage.removeItem('adminToken');
-        sessionStorage.removeItem('adminPwHash');
+        sessionStorage.removeItem('_ast');
         elements.adminBtn.textContent = '관리자 로그인';
         elements.adminBtn.classList.remove('logged-in');
         elements.csvBtn.classList.add('hidden');
@@ -531,8 +534,7 @@ function showAdminModal() {
         state.isAdmin = false;
         state.adminPassword = null;
         state.adminToken = null;
-        sessionStorage.removeItem('adminToken');
-        sessionStorage.removeItem('adminPwHash');
+        sessionStorage.removeItem('_ast');
         elements.adminBtn.textContent = '관리자 로그인';
         elements.adminBtn.classList.remove('logged-in');
         elements.csvBtn.classList.add('hidden');
@@ -562,11 +564,10 @@ async function handleAdminLogin() {
 
         if (isValid) {
             state.isAdmin = true;
-            state.adminPassword = pw; // 현재 세션에서만 메모리에 보관
+            state.adminPassword = pw;
             rateLimiter.reset();
             state.adminToken = generateSessionToken();
-            sessionStorage.setItem('adminToken', state.adminToken);
-            sessionStorage.setItem('adminPwHash', 'verified'); // 비밀번호 자체는 저장하지 않음
+            sessionStorage.setItem('_ast', pw);
 
             elements.adminBtn.textContent = '관리자 로그아웃';
             elements.adminBtn.classList.add('logged-in');
