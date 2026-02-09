@@ -238,11 +238,11 @@ CREATE POLICY "posts_update_policy" ON posts
   USING (false);
 
 -- 16. comments 테이블 정책
--- SELECT: 댓글 조회 허용
+-- SELECT: 직접 조회 차단 (get_comments 함수만 사용)
 DROP POLICY IF EXISTS "comments_select_policy" ON comments;
 CREATE POLICY "comments_select_policy" ON comments
   FOR SELECT
-  USING (true);
+  USING (false);
 
 -- INSERT: 댓글 작성은 create_comment 함수를 통해서만 (is_admin 위조 방지)
 DROP POLICY IF EXISTS "comments_insert_policy" ON comments;
@@ -436,6 +436,33 @@ BEGIN
   END IF;
 
   RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 24. 댓글 조회 함수 (게시글 비밀번호 검증 후 조회)
+CREATE OR REPLACE FUNCTION get_comments(
+  p_post_id UUID,
+  p_password TEXT
+)
+RETURNS TABLE(
+  id UUID,
+  post_id UUID,
+  content TEXT,
+  author_name TEXT,
+  is_admin BOOLEAN,
+  created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  -- 게시글 비밀번호 또는 관리자 비밀번호 검증
+  IF NOT verify_post_password(p_post_id, p_password) THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT c.id, c.post_id, c.content, c.author_name, c.is_admin, c.created_at
+  FROM comments c
+  WHERE c.post_id = p_post_id
+  ORDER BY c.created_at ASC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

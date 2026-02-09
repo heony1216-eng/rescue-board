@@ -37,7 +37,7 @@ const supabase = {
     }
 };
 
-const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, adminToken: null, selectedFiles: [], currentPostId: null, isEditing: false, editingPostId: null, uploadProgress: 0, currentPostDetail: null };
+const state = { posts: [], currentPage: 1, postsPerPage: 10, isAdmin: false, adminPassword: null, adminToken: null, selectedFiles: [], currentPostId: null, currentPostPassword: null, isEditing: false, editingPostId: null, uploadProgress: 0, currentPostDetail: null };
 
 // 관리자 세션 토큰 생성 (비밀번호 대신 랜덤 토큰 저장)
 function generateSessionToken() {
@@ -360,6 +360,7 @@ function showBoardList(pushHistory) {
     elements.boardList.classList.remove('hidden');
     elements.writeForm.classList.add('hidden');
     elements.viewPost.classList.add('hidden');
+    state.currentPostPassword = null;
     if (elements.commentSection) {
         elements.commentSection.classList.add('hidden');
     }
@@ -522,6 +523,7 @@ async function loadPostDetail(postId, password) {
             }
         }
 
+        state.currentPostPassword = state.isAdmin ? state.adminPassword : password;
         showViewPost(postDetail, true);
     } catch (e) {
         console.error('게시글 로드 실패:', e);
@@ -1243,9 +1245,10 @@ function updateThemeIcon(theme) {
 async function loadComments(postId) {
     if (!isValidUUID(postId)) return;
     try {
-        const res = await supabase.fetch(`comments?post_id=eq.${postId}&select=*&order=created_at.asc`);
-        if (!res.ok) throw new Error('댓글 로드 실패');
-        const comments = await res.json() || [];
+        const pw = state.isAdmin ? state.adminPassword : state.currentPostPassword;
+        if (!pw) { renderComments([]); return; }
+        const comments = await supabase.rpc('get_comments', { p_post_id: postId, p_password: pw });
+        if (!Array.isArray(comments)) { renderComments([]); return; }
         renderComments(comments);
     } catch (e) {
         console.error('댓글 로드 실패:', e);
